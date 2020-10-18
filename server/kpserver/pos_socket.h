@@ -24,6 +24,7 @@
 
 #include <vector>
 #include <stdint.h>
+#include <functional>
 
 ///
 /// Handles the position messages
@@ -39,12 +40,15 @@ struct Pos_socket {
     int get_port() const;
 
 private:
+    void print_error();
+
     int _port;
     int _addrlen;
+
     struct	sockaddr_in _addr;
     SOCKET _socket;
 
     std::vector<uint8_t> _recv_buffer;
 
-    
+    std::function<void(const std::vector<uint8_t>&)> _on_data;
 };

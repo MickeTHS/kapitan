@@ -28,6 +28,10 @@ Net_client::~Net_client() {
 #endif
 }
 
+std::string Net_client::get_ip() const {
+	return _info.ip;
+}
+
 bool Net_client::init() {
 	
 	/*int	 nbytes, addrlen;

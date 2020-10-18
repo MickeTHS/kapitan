@@ -18,6 +18,7 @@ struct Net_group {
 
     bool add_client(std::shared_ptr<Net_client> client);
     bool send_config();
+    int read();
 
 private:
     std::vector<std::shared_ptr<Net_client>> _clients;

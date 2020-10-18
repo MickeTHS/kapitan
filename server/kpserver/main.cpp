@@ -48,14 +48,14 @@ void print_byte_buffer(uint8_t *buffer, int length) {
 
 int main(int argc , char *argv[])
 {
-    int con_port = 0;
-    int pos_port = 0;
-    int chat_port = 0;
+    printf("KPSERVER v0.1\n");
 
+    int con_port = 0;
+    
     char listen_addr[64];
     
     if (argc < 3) {
-        printf("Invalid argument count\n");
+        printf("ERROR: Invalid argument count\n");
         // -a <listen address> , removed, listen on ANY
         printf("Usage: ./kpserver -pcon <port controller> -pchat <port chat> -ppos <port positions>  [-v]\n");
         return 0;
@@ -68,14 +68,6 @@ int main(int argc , char *argv[])
     		con_port = atoi(argv[i+1]);
     	}
 
-        if (!strcmp(argv[i], "-pchat")) {
-            chat_port = atoi(argv[i + 1]);
-        }
-
-    	if(!strcmp(argv[i],"-ppos")) {
-    		pos_port = atoi(argv[i+1]);
-    	}
-
         // we dont need -a
     	if(!strcmp(argv[i],"-a")) {
             strcpy(listen_addr, argv[i+1]);
@@ -83,17 +75,7 @@ int main(int argc , char *argv[])
     }
 
     if (con_port <= 0) {
-        printf("Invalid controller port: %d\n", con_port);
-        return 0;
-    }
-
-    if (pos_port <= 0) {
-        printf("Invalid position port: %d\n", pos_port);
-        return 0;
-    }
-
-    if (chat_port <= 0) {
-        printf("Invalid chat port: %d\n", chat_port);
+        printf("ERROR: controller port: %d\n", con_port);
         return 0;
     }
 
@@ -102,8 +84,6 @@ int main(int argc , char *argv[])
 
 
     tcp.set_on_new_client_callback([&](std::shared_ptr<Net_client> client){
-        printf("Got callback in main\n");
-
         group0.add_client(client);
         group0.send_config();
     });
@@ -122,6 +102,7 @@ int main(int argc , char *argv[])
     // bug? always registered as open, weird
     while (run) {
         tcp.read(con_port);
+        group0.read();
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
         /*

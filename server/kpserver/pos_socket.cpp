@@ -26,12 +26,14 @@
 #include <stdio.h>
 #endif
 
+#include "net_packet.h"
+
 Pos_socket::Pos_socket(int port) {
     _port = port;
 	_socket = -1;
 
-	printf("POS Socket created with port: %d\n", port);
-	
+	printf("[POS-UDP][OK][p: %d]\n", port);
+
 	// set up destination address 
 	memset(&_addr, 0, sizeof(_addr));
 	_addr.sin_family = AF_INET;
@@ -52,7 +54,19 @@ Pos_socket::~Pos_socket() {
 #endif
 }
 
+void Pos_socket::print_error() {
+	wchar_t* s = NULL;
+	FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+		NULL, WSAGetLastError(),
+		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+		(LPWSTR)&s, 0, NULL);
+	fprintf(stderr, "%S\n", s);
+	LocalFree(s);
+}
+
 bool Pos_socket::init() {
+	printf("[POS-UDP][INIT]\n");
+
 	int	 nbytes, addrlen;
 
 	uint8_t yes = 1;
@@ -68,8 +82,8 @@ bool Pos_socket::init() {
 #endif
 	// create what looks like an ordinary UDP socket
 	if ((_socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-		printf("Unable to open socket\n");
-		perror("socket");
+		printf("[POS-UDP][INIT][SOCKET][FAIL]\n");
+		
 #ifdef WIN32
 		WSACleanup();
 #endif
@@ -79,8 +93,7 @@ bool Pos_socket::init() {
 #ifdef WIN32
 	// allow multiple sockets to use the same PORT number 
 	if (setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, (const char*)&yes, sizeof(yes)) < 0) {
-		printf("Error reusing address\n");
-		perror("Reusing ADDR failed");
+		printf("[POS-UDP][INIT][REUSEADDR][FAIL]\n");
 
 		WSACleanup();
 
@@ -89,7 +102,7 @@ bool Pos_socket::init() {
 #else
 	int enable = 1;
 	if (setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
-		perror("setsockopt(SO_REUSEADDR) failed");
+		printf("[POS-UDP][INIT][REUSEADDR][FAIL]\n");
 
 		return false;
 	}
@@ -97,7 +110,7 @@ bool Pos_socket::init() {
 #ifdef SO_REUSEPORT
 
 	if (setsockopt(_socket, SOL_SOCKET, SO_REUSEPORT, &enable, sizeof(int)) < 0) {
-		perror("setsockopt(SO_REUSEPORT) failed");
+		printf("[POS-UDP][INIT][REUSEPORT][FAIL]\n");
 
 		return false;
 	}
@@ -105,12 +118,10 @@ bool Pos_socket::init() {
 #endif
 
 #endif
-
 	
 	// bind to receive address 
 	if (::bind(_socket, (struct sockaddr*)&_addr, sizeof(_addr)) < 0) {
-		printf("Error on bind\n");
-		perror("bind");
+		printf("[POS-UDP][INIT][BIND][FAIL]\n");
 #ifdef WIN32
 		WSACleanup();
 #endif
@@ -125,13 +136,13 @@ bool Pos_socket::init() {
 	int status = fcntl(_socket, F_SETFL, fcntl(_socket, F_GETFL, 0) | O_NONBLOCK);
 
 	if (status == -1) {
-		perror("calling fcntl");
+		printf("[POS-UDP][INIT][FIONBIO][FAIL]\n");
 		// handle the error.  By the way, I've never seen fcntl fail in this way
 	}
 
 #endif
 
-	printf("upd socket started on port %d\n", _port);
+	printf("[POS-UDP][INIT][OK][p: %d]\n", _port);
 
     return true;
 }
@@ -142,7 +153,11 @@ int Pos_socket::read() {
 
 #ifdef WIN32
 	while ((nbytes = recvfrom(_socket, (char*)&_recv_buffer[0], _recv_buffer.size(), 0, (struct sockaddr *) &_addr, &_addrlen)) >= 0) {
-		
+		printf("[POS-UDP][READ][l: %d][p: %d]\n", nbytes, ntohs(_addr.sin_port));
+
+		Net_pos pos;
+		pos.from_buffer(_recv_buffer);
+		pos.print();
 	}
 #else
 	while ((nbytes = recvfrom(_socket, (char*)&_recv_buffer[0], _recv_buffer.size(), 0, (struct sockaddr *) &_addr, (socklen_t*)&_addrlen) ) >= 0 ) {

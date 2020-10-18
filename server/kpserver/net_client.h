@@ -35,7 +35,7 @@ struct Net_client_info {
 	SOCKET socket;
 
 	void print() const {
-		printf("Client socket: fd: %d, port: %d, ip: %s\n", socket, port, ip.c_str());
+		printf("[NET-CLIENT][fd: %d][p: %d][ip: %s]\n", socket, port, ip.c_str());
 	}
 };
 
@@ -47,6 +47,8 @@ struct Net_client {
 	void handle_rec_packet(uint8_t* data, int msglen);
 	bool init();
 	void read();
+	std::string get_ip() const;
+
     void print_byte_buffer(uint8_t *buffer, int length);
 
     int mseconds_since_activity() const;
@@ -58,6 +60,7 @@ struct Net_client {
     std::vector<int>    queue;
 
 private:
+	
     Net_client_info     _info;
 	
 	struct	sockaddr_in _addr;

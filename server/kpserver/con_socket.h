@@ -43,18 +43,20 @@ struct Con_socket {
     bool init();
     int read(int con_port);
     int sendto_client(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data);
-
-    void print_error();
-
     void set_on_new_client_callback(std::function<void(std::shared_ptr<Net_client>)> func);
+
+private:
+    void print_error();
 
     int _con_port;
     
     SOCKET _master_socket;
-    int _max_clients;
     SOCKET _client_socket[30];
+
     struct sockaddr_in _address;
     int _addrlen;
+    
+    int _max_clients;
 
     std::vector<std::shared_ptr<Net_client>> _clients;
 

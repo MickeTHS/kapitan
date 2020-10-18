@@ -14,15 +14,13 @@ Net_group::Net_group(uint32_t id, int max_clients, Con_socket* con_socket) : _id
 
     int p = POS_PORT_START + rr;
 
-    printf("Random port is: %d\n", p);
-
     _pos_socket = std::make_shared<Pos_socket>(p);
 
     if (_pos_socket->init()) {
-        printf("Initialized POS socket '%d' for group '%d'\n", p, _id);
+        printf("[NET-GROUP][OK][id: %d][POS-UDP: %d]\n", _id, p);
     }
     else {
-        printf("ERROR: Init POS socket '%d' for group '%d'\n", p, _id);
+        printf("[NET-GROUP][FAIL][id: %d][POS-UDP: %d]\n", _id, p);
     }
 }
 
@@ -56,5 +54,9 @@ bool Net_group::send_config() {
     }
 
     return true;
+}
+
+int Net_group::read() {
+    return _pos_socket->read();
 }
 

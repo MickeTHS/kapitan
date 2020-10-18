@@ -42,6 +42,7 @@ void Con_socket::print_error() {
 }
 
 bool Con_socket::init() {
+    printf("[CON-TCP][INIT]\n");
     int opt = TRUE;
     int new_socket, i;
     _max_clients = 30;
@@ -57,7 +58,10 @@ bool Con_socket::init() {
 
     int wsa_result = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (wsa_result != 0) {
-        printf("WSAStartup failed with error: %d\n", wsa_result);
+        
+        printf("[CON-TCP][INIT][FAIL][WSASTARTUP]:\n");
+        print_error();
+
         return false;
     }
 #endif
@@ -65,7 +69,7 @@ bool Con_socket::init() {
     //create a master socket  
     if ((_master_socket = socket(AF_INET, SOCK_STREAM, 0)) == 0)
     {
-        perror("socket failed");
+        printf("[CON-TCP][INIT][FAIL][SOCKET]:\n");
         print_error();
         exit(EXIT_FAILURE);
     }
@@ -75,7 +79,9 @@ bool Con_socket::init() {
     if (setsockopt(_master_socket, SOL_SOCKET, SO_REUSEADDR, (char*)&opt,
         sizeof(opt)) < 0)
     {
-        perror("setsockopt");
+        printf("[CON-TCP][INIT][FAIL][REUSEADDR]:\n");
+        print_error();
+
         exit(EXIT_FAILURE);
     }
 
@@ -87,15 +93,19 @@ bool Con_socket::init() {
     //bind the socket to localhost port 8888  
     if (bind(_master_socket, (struct sockaddr*)&_address, sizeof(_address)) < 0)
     {
-        perror("bind failed");
+        printf("[CON-TCP][INIT][FAIL][BIND]:\n");
+        print_error();
+
         exit(EXIT_FAILURE);
     }
-    printf("Listener on port %d \n", _con_port);
+    
 
     //try to specify maximum of 3 pending connections for the master socket  
     if (listen(_master_socket, 3) < 0)
     {
-        perror("listen");
+        printf("[CON-TCP][INIT][FAIL][LISTEN]:\n");
+        print_error();
+
         exit(EXIT_FAILURE);
     }
 
@@ -103,7 +113,8 @@ bool Con_socket::init() {
 #ifdef WIN32
     if (setsockopt(_master_socket, SOL_SOCKET, SO_REUSEADDR, (const char*)&option, sizeof(option)) < 0) {
         WSACleanup();
-
+        printf("[CON-TCP][INIT][FAIL][REUSEADDR]:\n");
+        print_error();
         return false;
     }
 #else 
@@ -113,7 +124,7 @@ bool Con_socket::init() {
 
     //accept the incoming connection  
     _addrlen = sizeof(_address);
-    puts("Waiting for connections ...");
+    printf("[CON-TCP][INIT][OK][p: %d]\n", _con_port);
 
     return true;
 }
@@ -122,7 +133,10 @@ int Con_socket::sendto_client(std::shared_ptr<Net_client> client, const std::vec
 
     if (send(client->get_socket(), (const char*)&data[0], data.size(), 0) != data.size())
     {
-        perror("send");
+        printf("[CON-TCP][SEND][FAIL][h: %s][p: %d][l: %d]\n", client->get_ip().c_str(), _con_port, data.size());
+    }
+    else {
+        printf("[CON-TCP][SEND][OK][h: %s][p: %d][l: %d]\n", client->get_ip().c_str(), _con_port, data.size());
     }
 
     return 0;
@@ -141,9 +155,7 @@ int Con_socket::read(int con_port) {
 
     char buffer[1025];  //data buffer of 1K  
     //a message  
-    char* message = "ECHO Daemon v1.0 \r\n";
-
-
+    
     //while (TRUE)
     //{
         //clear the socket set  
@@ -179,7 +191,8 @@ int Con_socket::read(int con_port) {
 
         if ((activity < 0) && (errno != EINTR))
         {
-            printf("select error");
+            printf("[CON-TCP][READ][SELECT][FAIL][h:%s][p:%d][l:%d]\n");
+            print_error();
         }
 
         //If something happened on the master socket ,  
@@ -189,7 +202,7 @@ int Con_socket::read(int con_port) {
             if ((new_socket = accept(_master_socket,
                 (struct sockaddr*)&_address, (socklen_t*)&_addrlen)) < 0)
             {
-                perror("accept");
+                printf("[CON-TCP][READ][ACCEPT][FAIL][h:%s][p:%d][l:%d]\n");
                 exit(EXIT_FAILURE);
             }
 
@@ -201,23 +214,11 @@ int Con_socket::read(int con_port) {
             connection_info(_address, info);
             info.socket = new_socket;
 
-            printf("New connection: ");
+            printf("[CON-TCP][READ][NEW-CONNECTION][OK]");
             info.print();
 
             std::shared_ptr<Net_client> client = std::make_shared<Net_client>(info);
             _clients.push_back(client);
-
-            if (_on_new_client != nullptr) {
-                _on_new_client(client);
-            }
-
-            //send new connection greeting message  
-            if (send(new_socket, message, strlen(message), 0) != strlen(message))
-            {
-                perror("send");
-            }
-
-            puts("Welcome message sent successfully");
 
             //add new socket to array of sockets  
             for (i = 0; i < _max_clients; i++)
@@ -226,10 +227,13 @@ int Con_socket::read(int con_port) {
                 if (_client_socket[i] == 0)
                 {
                     _client_socket[i] = new_socket;
-                    printf("Adding to list of sockets as %d\n", i);
-
+                    
                     break;
                 }
+            }
+
+            if (_on_new_client != nullptr) {
+                _on_new_client(client);
             }
         }
 
@@ -246,20 +250,19 @@ int Con_socket::read(int con_port) {
                 {
                     //Somebody disconnected , get his details and print  
                     getpeername(sd, (struct sockaddr*)&_address, (socklen_t*)&_addrlen);
-                    printf("Host disconnected , ip %s , port %d \n", inet_ntoa(_address.sin_addr), ntohs(_address.sin_port));
+                    printf("[CON-TCP][READ][DISCONNECT][OK][ip: %s][p: %d]\n", inet_ntoa(_address.sin_addr), ntohs(_address.sin_port));
 
                     //Close the socket and mark as 0 in list for reuse  
                     closesocket(sd);
                     _client_socket[i] = 0;
                 }
-
                 //Echo back the message that came in  
                 else
                 {
                     //set the string terminating NULL byte on the end  
                     //of the data read  
-                    buffer[valread] = '\0';
-                    send(sd, buffer, strlen(buffer), 0);
+                    //buffer[valread] = '\0';
+                    //send(sd, buffer, strlen(buffer), 0);
                 }
             }
         }
