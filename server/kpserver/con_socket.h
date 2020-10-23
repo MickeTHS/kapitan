@@ -23,6 +23,8 @@
 #include <stdio.h>
 #endif
 
+
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>    //strlen
 #include <stdlib.h>
@@ -44,6 +46,7 @@ struct Con_socket {
     int read(int con_port);
     int sendto_client(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data);
     void set_on_new_client_callback(std::function<void(std::shared_ptr<Net_client>)> func);
+    void set_on_data_callback(std::function<void(std::shared_ptr<Net_client>, const std::vector<uint8_t>& data)> func);
 
 private:
     void print_error();
@@ -61,4 +64,5 @@ private:
     std::vector<std::shared_ptr<Net_client>> _clients;
 
     std::function<void(std::shared_ptr<Net_client>)> _on_new_client;
+    std::function<void(std::shared_ptr<Net_client>, const std::vector<uint8_t>& data)> _on_data;
 };

@@ -30,6 +30,9 @@ void Con_socket::set_on_new_client_callback(std::function<void(std::shared_ptr<N
     _on_new_client = func;
 }
 
+void Con_socket::set_on_data_callback(std::function<void(std::shared_ptr<Net_client>, const std::vector<uint8_t>& data)> func) {
+    _on_data = func;
+}
 
 void Con_socket::print_error() {
     wchar_t* s = NULL;
@@ -217,7 +220,7 @@ int Con_socket::read(int con_port) {
             printf("[CON-TCP][READ][NEW-CONNECTION][OK]");
             info.print();
 
-            std::shared_ptr<Net_client> client = std::make_shared<Net_client>(info);
+            std::shared_ptr<Net_client> client = std::make_shared<Net_client>(info, Net_client::__ID_COUNTER++);
             _clients.push_back(client);
 
             //add new socket to array of sockets  
@@ -237,8 +240,29 @@ int Con_socket::read(int con_port) {
             }
         }
 
+        for (auto client : _clients) {
+            sd = client->get_socket();
+
+            if (FD_ISSET(sd, &readfds)) {
+                if ((valread = recv(sd, buffer, 1024, 0)) == 0)
+                {
+                    //Somebody disconnected , get his details and print  
+                    getpeername(sd, (struct sockaddr*)&_address, (socklen_t*)&_addrlen);
+                    printf("[CON-TCP][READ][DISCONNECT][OK][ip: %s][p: %d]\n", inet_ntoa(_address.sin_addr), ntohs(_address.sin_port));
+
+                    //Close the socket and mark as 0 in list for reuse  
+                    closesocket(sd);
+                    _client_socket[i] = 0;
+                }
+                else {
+                    // parse the message
+
+                }
+            }
+        }
+
         //else its some IO operation on some other socket 
-        for (i = 0; i < _max_clients; i++)
+        /*for (i = 0; i < _max_clients; i++)
         {
             sd = _client_socket[i];
 
@@ -265,7 +289,7 @@ int Con_socket::read(int con_port) {
                     //send(sd, buffer, strlen(buffer), 0);
                 }
             }
-        }
+        }*/
     //}
 
     return 0;

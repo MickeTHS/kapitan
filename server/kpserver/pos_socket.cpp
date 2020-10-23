@@ -42,6 +42,8 @@ Pos_socket::Pos_socket(int port) {
 	_addrlen = sizeof(_addr);
 
 	_recv_buffer.resize(1024);
+
+	_on_data = nullptr;
 }
 
 Pos_socket::~Pos_socket() {
@@ -147,6 +149,10 @@ bool Pos_socket::init() {
     return true;
 }
 
+void Pos_socket::set_on_data(std::function<void(const std::vector<uint8_t>&)> func) {
+	_on_data = func;
+}
+
 int Pos_socket::read() {
 	
 	int nbytes;
@@ -158,6 +164,10 @@ int Pos_socket::read() {
 		Net_pos pos;
 		pos.from_buffer(_recv_buffer);
 		pos.print();
+
+		if (_on_data != nullptr) {
+			_on_data(_recv_buffer);
+		}
 	}
 #else
 	while ((nbytes = recvfrom(_socket, (char*)&_recv_buffer[0], _recv_buffer.size(), 0, (struct sockaddr *) &_addr, (socklen_t*)&_addrlen) ) >= 0 ) {

@@ -29,12 +29,16 @@
 #include <fcntl.h>
 #include <thread>
 #include <string>
+#include <memory>
 
 #include <chrono>
 
 #include "con_socket.h"
 #include "pos_socket.h"
-#include "net_group.h"
+#include "net_session.h"
+#include "world_instance.h"
+#include "ini_file.h"
+#include "net_master.h"
 
 void print_byte_buffer(uint8_t *buffer, int length) {
 	std::string debugOut;
@@ -50,60 +54,68 @@ int main(int argc , char *argv[])
 {
     printf("KPSERVER v0.1\n");
 
-    int con_port = 0;
-    
-    char listen_addr[64];
-    
+    char ini_filename[128];
+
     if (argc < 3) {
         printf("ERROR: Invalid argument count\n");
-        // -a <listen address> , removed, listen on ANY
-        printf("Usage: ./kpserver -pcon <port controller> -pchat <port chat> -ppos <port positions>  [-v]\n");
+        
+        printf("Usage: ./kpserver -ini master_eu.ini [-v]\n");
         return 0;
     }
 
     //parse the arguments
     for (int i = 1; i < argc; ++i) {
     	
-    	if(!strcmp(argv[i],"-pcon")) {
-    		con_port = atoi(argv[i+1]);
-    	}
-
-        // we dont need -a
-    	if(!strcmp(argv[i],"-a")) {
-            strcpy(listen_addr, argv[i+1]);
-		}
+    	if (!strcmp(argv[i], "-ini")) {
+            strcpy(ini_filename, argv[i + 1]);
+        }
     }
 
-    if (con_port <= 0) {
-        printf("ERROR: controller port: %d\n", con_port);
+    Ini_file ini(ini_filename);
+    ini.read();
+
+    if (ini.node == nullptr) {
+        printf("ERROR on startup: ini file missing [MASTER] or [SLAVE]\n");
         return 0;
     }
 
-    Con_socket tcp(con_port);
-    Net_group group0(123, 10, &tcp);
+    Con_socket tcp(ini.node->port);
 
+    std::vector<std::shared_ptr<Net_session>> sessions;
 
-    tcp.set_on_new_client_callback([&](std::shared_ptr<Net_client> client){
-        group0.add_client(client);
-        group0.send_config();
-    });
+    if (ini.node->is_master) {
+        printf("[MAIN][MASTER][STARTUP]\n");
 
-    tcp.init();
+        // master nodes doesnt start groups
+
+        std::shared_ptr<Net_master> master = std::make_shared<Net_master>(&tcp);
+    }
+    else {
+        printf("[MAIN][SLAVE][STARTUP]\n");
+
+        for (int i = 0; i < ini.node->max_groups; ++i) {
+
+            std::shared_ptr<Net_session> session = std::make_shared<Net_session>(ini.node->id + (1 + i), ini.node->max_users_per_group, &tcp, ini.node->udp_range_min + i);
+            sessions.push_back(session);
+
+            tcp.set_on_new_client_callback([&](std::shared_ptr<Net_client> client) {
+                session->add_client(client);
+                session->send_config();
+            });
+        }
+    }
     
-
-    char buffer[2000];
-    char sendbuffer[2000];
-
-    // POS socket must be accepted later, we dont know when it will connect
-    //std::thread tsockets(&Listen_sockets::run, &tcp);
+    tcp.init();
     
     bool run = true;
 
-    // bug? always registered as open, weird
     while (run) {
-        tcp.read(con_port);
-        group0.read();
+        tcp.read(ini.node->port);
 
+        for (auto session : sessions) {
+            session->read();
+        }
+        
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
         /*
         auto start = std::chrono::high_resolution_clock::now(); 

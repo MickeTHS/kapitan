@@ -38,10 +38,11 @@ struct Pos_socket {
     int read();
     int send(const std::vector<uint8_t>& data);
     int get_port() const;
+    void set_on_data(std::function<void(const std::vector<uint8_t>&)> func);
 
 private:
     void print_error();
-
+    
     int _port;
     int _addrlen;
 

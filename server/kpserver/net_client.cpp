@@ -9,9 +9,16 @@
 #include <unistd.h>
 #endif
 
+#define BUFFER_SIZE 2000
 
-Net_client::Net_client(Net_client_info info) {
+uint32_t Net_client::__ID_COUNTER = 0;
+
+Net_client::Net_client(Net_client_info info, uint32_t id) {
 	_info = info;
+	_id = id;
+
+	send_buffer.resize(BUFFER_SIZE);
+	buffer_pos = 0;
 }
 
 /**
@@ -30,6 +37,22 @@ Net_client::~Net_client() {
 
 std::string Net_client::get_ip() const {
 	return _info.ip;
+}
+
+bool Net_client::request_buffer_size(uint32_t size) const {
+	if (buffer_pos + size < BUFFER_SIZE) {
+		return true;
+	}
+
+	return false;
+}
+
+void Net_client::clear_buffer() {
+	buffer_pos = 0;
+}
+
+uint32_t Net_client::get_id() const {
+	return _id;
 }
 
 bool Net_client::init() {

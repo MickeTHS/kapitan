@@ -30,6 +30,12 @@
 #define MSG_BUF_SIZE 20000
 
 struct Net_client_info {
+	Net_client_info() {
+		ip = "";
+		port = 0;
+		socket = -1;
+	}
+
     std::string ip;
     int port;
 	SOCKET socket;
@@ -40,10 +46,11 @@ struct Net_client_info {
 };
 
 struct Net_client {
-    Net_client(Net_client_info info);
+	static uint32_t __ID_COUNTER;
+
+    Net_client(Net_client_info info, uint32_t id);
 	virtual ~Net_client();
 
-	
 	void handle_rec_packet(uint8_t* data, int msglen);
 	bool init();
 	void read();
@@ -53,12 +60,15 @@ struct Net_client {
 
     int mseconds_since_activity() const;
     SOCKET get_socket() const;
+	bool request_buffer_size(uint32_t size) const;
+	void clear_buffer();
 
 	void print() const;
-	//void close_socket();
 
-    std::vector<int>    queue;
-
+	uint32_t get_id() const;
+	
+	std::vector<uint8_t> send_buffer;
+	uint32_t buffer_pos;
 private:
 	
     Net_client_info     _info;
@@ -66,9 +76,6 @@ private:
 	struct	sockaddr_in _addr;
     struct  ip_mreq     _mreq;
 	int					_addrlen;
-	
-
-	uint8_t				_msg_buf[MSG_BUF_SIZE];
-
+	uint32_t			_id;
 	
 };
