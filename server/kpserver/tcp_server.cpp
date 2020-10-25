@@ -20,6 +20,7 @@ void connection_info(struct sockaddr_in& client, Net_client_info& info)
 Tcp_server::Tcp_server(int con_port) {
     _con_port = con_port;
     _on_new_client = nullptr;
+    _data_buffer.resize(2000);
 }
 
 Tcp_server::~Tcp_server() {
@@ -247,7 +248,7 @@ int Tcp_server::read(int con_port) {
             sd = client->get_socket();
 
             if (FD_ISSET(sd, &readfds)) {
-                if ((valread = recv(sd, buffer, 1024, 0)) == 0)
+                if ((valread = recv(sd, (char*)&_data_buffer[0], 1024, 0)) == 0)
                 {
                     //Somebody disconnected , get his details and print  
                     getpeername(sd, (struct sockaddr*)&_address, (socklen_t*)&_addrlen);
@@ -259,7 +260,10 @@ int Tcp_server::read(int con_port) {
                 }
                 else {
                     // parse the message
-
+                    if (_on_data != nullptr) {
+                        printf("data received: %d, first bytes: %d, %d, %d, %d, %d\n", valread, _data_buffer[0], _data_buffer[1], _data_buffer[2], _data_buffer[3], _data_buffer[4]);
+                        _on_data(client, _data_buffer);
+                    }
                 }
             }
         }

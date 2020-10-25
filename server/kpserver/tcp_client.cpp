@@ -93,6 +93,18 @@ void Tcp_client::print_error() {
 #endif
 }
 
+bool Tcp_client::send_data(const std::vector<uint8_t>& buffer, int len) {
+    size_t bytes_sent;
+    
+    if ((bytes_sent = send(_socket, (const char*)&buffer[0], len, 0)) != len) {
+        printf("[TCP-CLIENT][SEND_DATA][ERROR][Unable to send data]\n");
+        print_error();
+        return false;
+    }
+
+    return true;
+}
+
 int Tcp_client::read_data(std::vector<uint8_t>& buffer) {
 
     if (!_initialized) {
@@ -100,6 +112,21 @@ int Tcp_client::read_data(std::vector<uint8_t>& buffer) {
     }
 
     int valread;
+
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(_socket, &readfds);
+
+    timeval tt;
+    tt.tv_sec = 0;
+    tt.tv_usec = 1000;
+
+
+    int activity = select(_socket, &readfds, NULL, NULL, &tt);
+
+    if (!FD_ISSET(_socket, &readfds)) {
+        return 0; // no activity so skip this
+    }
 
     if ((valread = recv(_socket, (char*)&buffer[0], 1024, 0)) <= 0)
     {
@@ -109,8 +136,53 @@ int Tcp_client::read_data(std::vector<uint8_t>& buffer) {
                 closesocket(_socket);
                 break;
             case WSAEWOULDBLOCK:
-                //printf("[TCP-CLIENT][READ][ERROR][WSAEWOULDBLOCK]\n");
+                printf("[TCP-CLIENT][READ][ERROR][WSAEWOULDBLOCK]\n");
                 // would block, so no data
+                break;
+            case WSANOTINITIALISED:
+                printf("[TCP-CLIENT][READ][ERROR][WSANOTINITIALISED]\n");
+                break;
+            case WSAENETDOWN:
+                printf("[TCP-CLIENT][READ][ERROR][WSAENETDOWN]\n");
+                break;
+            case WSAEFAULT:
+                printf("[TCP-CLIENT][READ][ERROR][WSAEFAULT]\n");
+                break;
+            case WSAENOTCONN:
+                printf("[TCP-CLIENT][READ][ERROR][WSAENOTCONN]\n");
+                break;
+            case WSAEINTR:
+                printf("[TCP-CLIENT][READ][ERROR][WSAEINTR]\n");
+                break;
+            case WSAEINPROGRESS:
+                printf("[TCP-CLIENT][READ][ERROR][WSAEINPROGRESS]\n");
+                break;
+            case WSAENETRESET:
+                printf("[TCP-CLIENT][READ][ERROR][WSAENETRESET]\n");
+                break;
+            case WSAENOTSOCK:
+                printf("[TCP-CLIENT][READ][ERROR][WSAENOTSOCK]\n");
+                break;
+            case WSAEOPNOTSUPP:
+                printf("[TCP-CLIENT][READ][ERROR][WSAEOPNOTSUPP]\n");
+                break;
+            case WSAESHUTDOWN:
+                printf("[TCP-CLIENT][READ][ERROR][WSAESHUTDOWN]\n");
+                break;
+            case WSAEMSGSIZE:
+                printf("[TCP-CLIENT][READ][ERROR][WSAEMSGSIZE]\n");
+                break;
+            case WSAEINVAL:
+                printf("[TCP-CLIENT][READ][ERROR][WSAEINVAL]\n");
+                break;
+            case WSAECONNABORTED:
+                printf("[TCP-CLIENT][READ][ERROR][WSAECONNABORTED]\n");
+                break;
+            case WSAETIMEDOUT:
+                printf("[TCP-CLIENT][READ][ERROR][WSAETIMEDOUT]\n");
+                break;
+            case WSAECONNRESET:
+                printf("[TCP-CLIENT][READ][ERROR][WSAECONNRESET]\n");
                 break;
             default:
                 printf("[TCP-CLIENT][READ][ERROR][%d]\n", valread);

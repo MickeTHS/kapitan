@@ -26,9 +26,6 @@ void Net_slave::on_inc_data(std::shared_ptr<Net_client> client, const std::vecto
 
 bool Net_slave::init() {
     // connect to master
-
-    Net_slave_register_on_master reg(_master.node->id, _master.node->master_password);
-
     auto master = _ini_file.get_master();
 
     if (!_master_connection->init(master->hostname.c_str(), master->port)) {
@@ -36,6 +33,18 @@ bool Net_slave::init() {
         return false;
     }
 
+    // the first thing we need to send is a registration packet 
+    // that authenticates with the master
+    Net_slave_register_on_master reg(_master.node->id, _master.node->master_password);
+    reg.set_buffer(_data_buffer, 0);
+    printf("msgtype:%d\n",_data_buffer[0]);
+
+    if (!_master_connection->send_data(_data_buffer, sizeof(Net_slave_register_on_master))) {
+        printf("[NET-SLAVE][INIT][ERROR][Unable to authenticate with the master]\n");
+        return false;
+    }
+
+    printf("[NET-SLAVE][INIT][Authentication packet sent]\n");
 
     return true;
 }
@@ -43,8 +52,11 @@ bool Net_slave::init() {
 void Net_slave::handle_master_command(const Net_master_to_slave_command& command) {
     switch ((NetMasterToSlaveCommand)command.command) {
         case NetMasterToSlaveCommand::ReportHealth:
-
-        break;
+            printf("[NET-SLAVE][HANDLE-MASTER-COMMAND][Will send health report]\n");
+            break;
+        default:
+            printf("[NET-SLAVE][HANDLE-MASTER-COMMAND][ERROR][Unknown command: %d]\n", command.command);
+            break;
     }
 }
 
@@ -84,6 +96,9 @@ void Net_slave::update() {
                 handle_master_command(cmd);
                 break;
             }
+            default: 
+                printf("[NET-SLAVE][UPDATE][ERROR][Unknown message type: %d]\n", type);
+                break;
         }
     }
 

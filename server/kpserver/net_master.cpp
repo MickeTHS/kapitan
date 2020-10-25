@@ -8,16 +8,12 @@
 Net_master::Net_master(Tcp_server* tcp, const Ini_file& file) : _ini_file(file) {
     _tcp = tcp;
     _data_buffer.resize(1000);
+    _my_node = _ini_file.get_me();
     
     _next_slave_report = std::chrono::high_resolution_clock::now() - std::chrono::minutes(60);
     
-    std::vector<std::shared_ptr<Ini_node>> slaves;
-
-    file.get_slaves(slaves);
-
-    for (auto ptr : slaves) {
-        _slaves.push_back(std::make_shared<Net_slave_info>(ptr));
-    }
+    //std::vector<std::shared_ptr<Ini_node>> slaves;
+    //file.get_slaves(slaves);
 
     _tcp->set_on_data_callback([&](std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data) {
         on_inc_data(client, data);
@@ -29,13 +25,14 @@ Net_master::~Net_master() {
 }
 
 void Net_master::on_client_connect(std::shared_ptr<Net_client> client) {
-    printf("[NET-mASTER][New slave connected]\n");
+    printf("[NET-MASTER][New slave connected]\n");
 
     // we must receive a password or we will disconnect the client
 }
 
 void Net_master::on_inc_data(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data) {
-    MsgType type = (MsgType)((uint8_t)&data[0]);
+    printf("casting %d to %d\n", data[0], (MsgType)((uint8_t)data[0]));
+    MsgType type = (MsgType)((uint8_t)data[0]);
 
     switch (type) {
         case MsgType::NetPlayerRequestSlaveNode: {
@@ -67,8 +64,44 @@ void Net_master::on_inc_data(std::shared_ptr<Net_client> client, const std::vect
 
                 _session_id_lookup[id]->keepalive();
             }
+            break;
+        }
+        case MsgType::NetSlaveRegisterOnMaster: {
+            printf("[NET-MASTER][NetSlaveRegisterOnMaster][Authenticating...]\n");
+
+            Net_slave_register_on_master reg(data);
+
+            if (reg.master_password == _my_node->master_password) {
+                printf("[NET-MASTER][NetSlaveRegisterOnMaster][Slave successfully authenticated]\n");
+                
+                // check if the slave is already registered
+                bool found = false;
+
+                for (auto sl : _slaves) {
+                    if (sl->slave_id == reg.slave_id) {
+                        found = true;
+                        break;
+                    }
+                }
+
+                // link up the client to a slave_node_info
+                if (!found) {
+                    auto slave = std::make_shared<Net_slave_info>(client, reg.slave_id);
+                    _slaves.push_back(slave);
+
+                    printf("[NET-MASTER][New slave node registered successfully]\n");
+                }
+                else {
+                    printf("[NET-MASTER][NOTICE][Authenticated slave is already registered]\n");
+                }
+            }
+            else {
+                printf("[NET-MASTER][NetSlaveRegisterOnMaster][FAILED][Mismatched password]\n");
+            }
+            break;
         }
         default:
+            printf("[NET-MASTER][ON_INC_DATA][ERROR][Unknown message type: %d]\n", type);
             break;
     }
 }
@@ -89,9 +122,13 @@ void Net_master::update() {
         if (!_tcp->send_data_to_all(_data_buffer, sizeof(NetMasterToSlaveCommand))) {
             printf("[NET-MASTER][UPDATE][Demand report send failed]\n");
         }
+        else {
+            printf("[NET-MASTER][UPDATE][Demand report sent]\n");
+        }
     }
 }
 
-Net_slave_info::Net_slave_info(std::shared_ptr<Ini_node> slave_config) {
-    config = slave_config;
+Net_slave_info::Net_slave_info(std::shared_ptr<Net_client> client_, uint32_t slave_id_) 
+    : client(client_), slave_id(slave_id_) {
+    
 }

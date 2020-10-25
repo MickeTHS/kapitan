@@ -15,9 +15,10 @@
 struct Tcp_server;
 
 struct Net_slave_info {
-    Net_slave_info(std::shared_ptr<Ini_node> slave_config);
+    Net_slave_info(std::shared_ptr<Net_client> client_, uint32_t slave_id_);
 
-    std::shared_ptr<Ini_node> config;
+    uint32_t slave_id;
+    std::shared_ptr<Net_client> client;
 };
 
 struct Net_master {

@@ -67,4 +67,6 @@ private:
 
     std::function<void(std::shared_ptr<Net_client>)> _on_new_client;
     std::function<void(std::shared_ptr<Net_client>, const std::vector<uint8_t>& data)> _on_data;
+
+    std::vector<uint8_t> _data_buffer;
 };

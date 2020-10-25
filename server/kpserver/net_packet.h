@@ -5,6 +5,8 @@
 #include <vector>
 #include <stdio.h>
 
+#pragma pack(push, 1)
+
 /// The packet we send to clients as well as receive
 
 enum class MsgType {
@@ -479,3 +481,5 @@ struct Net_packet {
 
 
 /// ------- End ingame packets ---------- ///
+
+#pragma pack(pop)
