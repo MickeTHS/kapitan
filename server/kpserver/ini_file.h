@@ -18,8 +18,13 @@ struct Ini_node {
     uint32_t max_groups;
     uint32_t udp_range_min;
     uint32_t udp_range_max;
+    uint32_t keepalive_time_seconds;
+    uint32_t ticks_per_second_internal; // how often we simulate
+    uint32_t ticks_per_second_position_update_sends; // how often we send position/player updates
+    uint32_t slave_sync_interval_seconds;
+    uint64_t master_password;
 
-    bool is_main;
+    bool is_me;
     bool is_master;
 
     Ini_node();
@@ -30,11 +35,15 @@ struct Ini_node {
 };
 
 struct Ini_file {
-    std::shared_ptr<Ini_node> node;
+    Ini_file() {}
 
-    std::vector<std::shared_ptr<Ini_node>> children;
+    std::vector<std::shared_ptr<Ini_node>> nodes;
 
     Ini_file(const std::string& filename);
+
+    std::shared_ptr<Ini_node> get_master() const;
+    std::shared_ptr<Ini_node> get_me() const;
+    void get_slaves(std::vector<std::shared_ptr<Ini_node>>& slaves) const;
 
     void print_help();
     bool save();

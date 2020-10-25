@@ -1,12 +1,18 @@
 #include "net_session.h"
 #include <cstdlib>
 #include <stdio.h>
+#include <string>
+#include <stdlib.h>
+#include <time.h>
 
 #include "net_packet.h"
-#include "con_socket.h"
+#include "tcp_server.h"
 
-Net_session::Net_session(uint32_t id, int max_clients, Con_socket* con_socket, int udp_port) : _id(id), _max_clients(max_clients), _on_pos(nullptr), _con_socket(con_socket) {
+Net_session::Net_session(uint32_t id, int max_clients, Tcp_server* tcp_server, int udp_port) : _id(id), _max_clients(max_clients), _on_pos(nullptr), _tcp_server(tcp_server) {
     int p = udp_port;
+
+    memset(session_code, 0, 16);
+    generate_session_code();
 
     _world = std::make_shared<World_instance>();
 
@@ -25,6 +31,25 @@ Net_session::Net_session(uint32_t id, int max_clients, Con_socket* con_socket, i
 }
 
 Net_session::~Net_session() {}
+
+void Net_session::keepalive() {
+    _last_keepalive = std::chrono::high_resolution_clock::now();
+}
+
+void Net_session::generate_session_code() {
+    char alfa[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ\0";
+    int len = strlen(alfa);
+
+    srand(time(NULL));
+
+    for (int i = 0; i < 8; ++i) {
+        session_code[i] = alfa[rand() % len];
+    }
+
+    session_code[8] = '\0';
+
+    session_code_hash = mmh::Hash_key(session_code);
+}
 
 void Net_session::on_udp_data(const std::vector<uint8_t>& data) {
     MsgType type = (MsgType)data[0];
@@ -79,7 +104,7 @@ bool Net_session::send_config() {
     config.set_buffer(data, 0);
 
     for (auto client : _clients) {
-        _con_socket->sendto_client(client, data);
+        _tcp_server->sendto_client(client, data);
     }
 
     return true;

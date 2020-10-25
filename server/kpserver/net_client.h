@@ -56,8 +56,6 @@ struct Net_client {
 	void read();
 	std::string get_ip() const;
 
-    void print_byte_buffer(uint8_t *buffer, int length);
-
     int mseconds_since_activity() const;
     SOCKET get_socket() const;
 	bool request_buffer_size(uint32_t size) const;

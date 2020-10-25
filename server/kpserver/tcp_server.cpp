@@ -1,4 +1,4 @@
-#include "con_socket.h"
+#include "tcp_server.h"
 
 #include <iostream>
 #include <thread>
@@ -17,24 +17,26 @@ void connection_info(struct sockaddr_in& client, Net_client_info& info)
 }
 
 
-Con_socket::Con_socket(int con_port) {
+Tcp_server::Tcp_server(int con_port) {
     _con_port = con_port;
     _on_new_client = nullptr;
 }
 
-Con_socket::~Con_socket() {
+Tcp_server::~Tcp_server() {
 
 }
 
-void Con_socket::set_on_new_client_callback(std::function<void(std::shared_ptr<Net_client>)> func) {
+void Tcp_server::set_on_new_client_callback(std::function<void(std::shared_ptr<Net_client>)> func) {
     _on_new_client = func;
 }
 
-void Con_socket::set_on_data_callback(std::function<void(std::shared_ptr<Net_client>, const std::vector<uint8_t>& data)> func) {
+void Tcp_server::set_on_data_callback(std::function<void(std::shared_ptr<Net_client>, const std::vector<uint8_t>& data)> func) {
     _on_data = func;
 }
 
-void Con_socket::print_error() {
+void Tcp_server::print_error() {
+
+#ifdef WIN32
     wchar_t* s = NULL;
     FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
         NULL, WSAGetLastError(),
@@ -42,9 +44,10 @@ void Con_socket::print_error() {
         (LPWSTR)&s, 0, NULL);
     fprintf(stderr, "%S\n", s);
     LocalFree(s);
+#endif
 }
 
-bool Con_socket::init() {
+bool Tcp_server::init() {
     printf("[CON-TCP][INIT]\n");
     int opt = TRUE;
     int new_socket, i;
@@ -132,7 +135,7 @@ bool Con_socket::init() {
     return true;
 }
 
-int Con_socket::sendto_client(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data) {
+int Tcp_server::sendto_client(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data) {
 
     if (send(client->get_socket(), (const char*)&data[0], data.size(), 0) != data.size())
     {
@@ -145,7 +148,7 @@ int Con_socket::sendto_client(std::shared_ptr<Net_client> client, const std::vec
     return 0;
 }
 
-int Con_socket::read(int con_port) {
+int Tcp_server::read(int con_port) {
     //set of socket descriptors  
     fd_set readfds;
     int max_sd;
@@ -293,4 +296,22 @@ int Con_socket::read(int con_port) {
     //}
 
     return 0;
+}
+
+
+bool Tcp_server::send_data_to_all(const std::vector<uint8_t>& data, size_t len) {
+    SOCKET sd;
+    fd_set readfds;
+    size_t bytes_sent;
+    bool success = true;
+
+    for (auto client : _clients) {
+        sd = client->get_socket();
+        if ((bytes_sent = send(sd, (const char*)&data[0], len, 0)) != len) {
+            printf("[CON-TCP][SEND_DATA_TO_ALL][ERROR][Unable to send to client socket]\n");
+            success = false;
+        }
+    }
+
+    return success;
 }

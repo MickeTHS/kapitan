@@ -16,21 +16,272 @@ enum class MsgType {
     NetSlaveSessionSummary,
     NetPlayer,
     NetPlayerRequestSlaveConfig,
-    NetSnapshotPlayer
+    NetSnapshotPlayer,
+    NetRegisterPlayer,
+    NetFromSlaveToMasterKeepaliveSession,
+    NetFromMasterToSlaveCommand,
+    NetPlayerJoinSession,
+    NetError,
+    NetSlaveRegisterOnMaster,
+    NetSlaveHealthReport
+};
+
+enum class NetErrorType {
+    None = 0,
+    SessionNotFound,
+};
+
+
+enum class NetMasterToSlaveCommand {
+    None = 0,
+    ReportHealth
+};
+
+//// ########## COMMON PACKETS ################### ////
+
+struct Net_error {
+    uint8_t type;
+    uint8_t error;
+
+    Net_error(NetErrorType error_type) {
+        type = (uint8_t)MsgType::NetError;
+        error = (uint8_t)error_type;
+    }
+
+};
+
+//// ############# END COMMON PACKETS ############ ////
+
+
+//// ########### MASTER NODE PACKETS ############# ////
+
+/// <summary>
+/// Slaves must send this signal on initiation so they get registered on the master node
+/// </summary>
+struct Net_slave_register_on_master {
+    uint8_t type;
+    uint32_t slave_id;
+    uint64_t master_password;
+
+    Net_slave_register_on_master(uint32_t slave_id_, uint64_t master_password_) {
+        type = (uint8_t)MsgType::NetSlaveRegisterOnMaster;
+        slave_id = slave_id_;
+        master_password = master_password_;
+    }
+
+    Net_slave_register_on_master(const std::vector<uint8_t>& data) {
+        memcpy(this, &data[0], sizeof(Net_slave_register_on_master));
+    }
+
+    void set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
+        memcpy(&data[offset], this, sizeof(Net_slave_register_on_master));
+    }
 };
 
 /// <summary>
-/// this is the struct we use for the snapshot
-/// which is a lightweight struct that tells
-/// all relevant information about the player
+/// When a player wants to join a session
 /// </summary>
-struct Net_snapshot_player {
+struct Net_player_join_session {
     uint8_t type;
-    uint16_t entity_id;
-    uint8_t hp;
-    uint8_t prone_status; // 0 -> dead, 1 -> alive, 2 -> unconscious
-    uint8_t engagement_status; // 0 -> idle, 1 -> hacking, 2 -> grinding door
+    char code[16];
+
+    Net_player_join_session() {
+        type = (uint8_t)MsgType::NetPlayerJoinSession;
+        memset(code, 0, 16);
+    }
+
+    Net_player_join_session(const std::vector<uint8_t>& data) {
+        memcpy(this, &data[0], sizeof(Net_player_join_session));
+    }
 };
+
+/// <summary>
+/// Sent to a master node to get a "good" slave node
+/// Should send back a Net_slave_config to the player
+/// </summary>
+struct Net_player_request_slave_node {
+    uint8_t type;
+
+    Net_player_request_slave_node() {
+        type = (uint8_t)MsgType::NetPlayerRequestSlaveNode;
+    }
+
+};
+
+/// <summary>
+/// Sends a signal to the slave
+/// send command 0 to force a keepalive message from the slave
+/// </summary>
+struct Net_master_to_slave_command {
+    uint8_t type;
+    uint8_t command; // 0 -> report keepalive, 1 -> shutdown sessions, 2 -> process shutdown
+
+    Net_master_to_slave_command() {
+        type = (uint8_t)MsgType::NetFromMasterToSlaveCommand;
+        command = 0;
+    }
+
+    Net_master_to_slave_command(NetMasterToSlaveCommand cmd) {
+        type = (uint8_t)MsgType::NetFromMasterToSlaveCommand;
+        command = (uint8_t)cmd;
+    }
+
+    Net_master_to_slave_command(const std::vector<uint8_t>& data, uint32_t offset) {
+        memcpy(this, &data[offset], sizeof(Net_master_to_slave_command));
+    }
+
+    void set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
+        memcpy(&data[offset], &type, sizeof(uint8_t));
+        memcpy(&data[offset + sizeof(uint8_t)], &command, sizeof(uint8_t));
+    }
+};
+
+/// <summary>
+/// A minimal health report sent from the slave to the master
+/// to be used to determine if the slave node is a "good" candidate
+/// for more sessions
+/// </summary>
+struct Net_slave_health_snapshot {
+    uint8_t type;
+
+    uint16_t pct_virt_process_ram_used;
+    uint16_t pct_good_vs_lag_ticks;
+    int64_t avg_tick_idle_time;
+    uint16_t pct_cpu_load_process;
+
+    Net_slave_health_snapshot(float virt_process_ram_used, float good_vs_lag_ticks, int64_t avg_idle_time, float cpu_load) {
+        type = (uint8_t)MsgType::NetSlaveHealthReport;
+        pct_virt_process_ram_used = (uint16_t)(virt_process_ram_used * 10000.0f);
+        pct_good_vs_lag_ticks = (uint16_t)(good_vs_lag_ticks * 10000.0f);
+        pct_cpu_load_process = (uint16_t)(cpu_load * 10000.0f);
+
+        avg_tick_idle_time = avg_idle_time;
+    }
+
+    Net_slave_health_snapshot(const std::vector<uint8_t>& data, uint32_t offset) {
+        memcpy(this, &data[offset], sizeof(Net_slave_health_snapshot));
+    }
+
+    void set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
+        memcpy(&data[offset], this, sizeof(Net_slave_health_snapshot));
+    }
+
+};
+
+/// <summary>
+/// Message that reports the health of the slave node
+/// How many sessions are filled and how many more we can allow
+/// </summary>
+struct Net_from_slave_report_health {
+    uint8_t type;
+    uint32_t num_alive_sessions;
+    uint32_t num_sessions_free;
+    uint16_t cpu_load;
+    uint32_t mem_used_mb;
+    uint32_t mem_free_mb;
+};
+
+/// <summary>
+/// A signal that instructs the master node to keep the session alive in memory
+/// When the host has disconnected this message will stop
+/// </summary>
+struct Net_from_slave_keepalive_sessions {
+    uint8_t type;
+    uint32_t num_sessions;
+    std::vector<uint32_t> session_ids;
+
+    Net_from_slave_keepalive_sessions() {
+        type = (uint8_t)MsgType::NetFromSlaveToMasterKeepaliveSession;
+        num_sessions = 0;
+    }
+
+    Net_from_slave_keepalive_sessions(const std::vector<uint8_t>& data) {
+        memcpy(&type, &data[0], sizeof(uint8_t));
+        memcpy(&num_sessions, &data[sizeof(uint8_t)], sizeof(uint32_t));
+
+        if (num_sessions > 10000000) { // if its larger than 1000000 sessions, somethings really odd
+            printf("[NET-FROM-SLAVE-KEEPALIVE-SESSIONS][ERROR][Num sessions too large]\n");
+            return;
+        }
+
+        session_ids.resize(num_sessions);
+        memcpy(&session_ids[0], &data[sizeof(uint8_t) + sizeof(uint32_t)], sizeof(uint32_t) * num_sessions);
+    }
+};
+
+/// <summary>
+/// Registers the player on the master node so friends can find the player
+/// </summary>
+struct Net_register_player {
+    uint8_t type;
+    char username[64];
+    uint16_t avatar[32];
+    
+    Net_register_player() {
+        type = (uint8_t)MsgType::NetRegisterPlayer;
+    }
+
+    Net_register_player(const std::vector<uint8_t>& data) {
+        memcpy(this, &data[0], sizeof(Net_register_player));
+    }
+};
+
+
+/// <summary>
+/// Gets a summary configuration to the slave node so players can connect to it
+/// Can also be fetched from the slave node itself
+/// </summary>
+struct Net_slave_config {
+    uint8_t type;
+    uint32_t node_id;
+    uint32_t port;
+    char hostname[64];
+
+    Net_slave_config(const std::vector<uint8_t>& data) {
+        memcpy(this, &data[0], sizeof(Net_slave_config));
+    }
+
+    Net_slave_config() {
+        type = (uint8_t)MsgType::NetSlaveConfig;
+        port = 0;
+        node_id = 0;
+        memset(hostname, 0, 64);
+    }
+
+    void from_buffer(const std::vector<uint8_t>& data) {
+        memcpy(&type, &data[0], sizeof(type));
+        memcpy(&node_id, &data[sizeof(type)], sizeof(node_id));
+        memcpy(&port, &data[sizeof(type) + sizeof(node_id)], sizeof(port));
+        memcpy(&hostname[0], &data[sizeof(type) + sizeof(node_id) + sizeof(port)], 64);
+    }
+
+    void set_buffer_fast(std::vector<uint8_t>& data, uint32_t offset) {
+        memcpy(&data[offset], this, sizeof(Net_slave_config));
+    }
+
+    void set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
+        memcpy(&data[offset], &type, sizeof(type));
+        memcpy(&data[offset + sizeof(type)], &node_id, sizeof(node_id));
+        memcpy(&data[offset + sizeof(type) + sizeof(node_id)], &port, sizeof(port));
+        memcpy(&data[offset + sizeof(type) + sizeof(node_id) + sizeof(port)], &hostname, 64);
+    }
+};
+
+
+//// ########## END MASTER NODE PACKETS ############# ////
+
+//// ########## SLAVE NODE PACKETS ################## ////
+
+/// ---------- Lobby/connection packets --------------- //
+
+struct Net_player_request_slave_config {
+    uint8_t type;
+
+    Net_player_request_slave_config() {
+        type = (uint8_t)MsgType::NetPlayerRequestSlaveConfig;
+    }
+};
+
 
 struct Net_player {
     uint8_t type;
@@ -65,70 +316,13 @@ struct Net_player {
         return true;
     }
 
-    void set_buffer_fast(std::vector<uint8_t>&data, uint32_t offset) {
+    void set_buffer_fast(std::vector<uint8_t>& data, uint32_t offset) {
         memcpy(&data[offset], this, sizeof(Net_player));
     }
 };
 
-/// <summary>
-/// Sent to a master node to get a "good" slave node
-/// Should send back a Net_slave_config to the player
-/// </summary>
-struct Net_player_request_slave_node {
-    uint8_t type;
 
-    Net_player_request_slave_node() {
-        type = (uint8_t)MsgType::NetPlayerRequestSlaveNode;
-    }
-};
 
-struct Net_player_request_slave_config {
-    uint8_t type;
-
-    Net_player_request_slave_config() {
-        type = (uint8_t)MsgType::NetPlayerRequestSlaveConfig;
-    }
-};
-
-/// <summary>
-/// Gets a summary configuration to the slave node so players can connect to it
-/// </summary>
-struct Net_slave_config {
-    uint8_t type;
-    uint32_t node_id;
-    uint32_t port;
-
-    char hostname[64];
-    
-    Net_slave_config(const std::vector<uint8_t>& data) {
-        memcpy(this, &data[0], sizeof(Net_slave_config));
-    }
-
-    Net_slave_config() {
-        type = (uint8_t)MsgType::NetSlaveConfig;
-        port = 0;
-        node_id = 0;
-        memset(hostname, 0, 64);
-    }
-
-    void from_buffer(const std::vector<uint8_t>& data) {
-        memcpy(&type, &data[0], sizeof(type));
-        memcpy(&node_id, &data[sizeof(type)], sizeof(node_id));
-        memcpy(&port, &data[sizeof(type) + sizeof(node_id)], sizeof(port));
-        memcpy(&hostname[0], &data[sizeof(type) + sizeof(node_id) + sizeof(port)], 64);
-    }
-
-    void set_buffer_fast(std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&data[offset], this, sizeof(Net_slave_config));
-    }
-
-    void set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&data[offset], &type, sizeof(type));
-        memcpy(&data[offset + sizeof(type)], &node_id, sizeof(node_id));
-        memcpy(&data[offset + sizeof(type) + sizeof(node_id)], &port, sizeof(port));
-        memcpy(&data[offset + sizeof(type) + sizeof(node_id) + sizeof(port)], &hostname, 64);
-    }
-};
 
 /// <summary>
 /// Lists all players in a session
@@ -222,6 +416,25 @@ struct Net_group_config {
     }
 };
 
+
+/// --------- End lobby/connection packets ------------ //
+
+/// ---------- Begin Ingame Packets ------------------- //
+
+/// <summary>
+/// this is the struct we use for the snapshot
+/// which is a lightweight struct that tells
+/// all relevant information about the player
+/// </summary>
+struct Net_snapshot_player {
+    uint8_t type;
+    uint16_t entity_id;
+    uint8_t hp;
+    uint8_t prone_status; // 0 -> dead, 1 -> alive, 2 -> unconscious
+    uint8_t engagement_status; // 0 -> idle, 1 -> hacking, 2 -> grinding door
+};
+
+
 struct Net_pos {
     uint8_t type;
     uint16_t entity;
@@ -263,3 +476,6 @@ struct Net_packet {
 
     std::vector<uint8_t> data;
 };
+
+
+/// ------- End ingame packets ---------- ///

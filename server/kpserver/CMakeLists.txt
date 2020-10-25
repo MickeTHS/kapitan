@@ -1,21 +1,20 @@
 cmake_minimum_required(VERSION 3.2)
-PROJECT(kpserver)
-SET (CMAKE_BUILD_TYPE Release)
+project(kpserver)
+set (CMAKE_BUILD_TYPE Release)
 
-IF(WIN32)
-add_definitions(-DWIN32)
-set(CMAKE_CXX_FLAGS "-m32 -msse -std=c++11 -pthread")
-ELSE(WIN32)
-set(CMAKE_CXX_FLAGS "-std=c++11 -pthread -static-libstdc++ -O3")
-set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined -pthread -std=c++11 -static-libstdc++ -O3")
-ENDIF(WIN32)
+if(WIN32)
+    add_definitions(-DWIN32)
+else(WIN32)
+    set(CMAKE_CXX_FLAGS "-std=c++11 -pthread -static-libstdc++ -O3")
+    set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined -pthread -std=c++11 -static-libstdc++ -O3")
+endif(WIN32)
 
 include_directories(ext)
 
-SET(KPSERVER_SRC_FILES
+set(KPSERVER_SRC_FILES
     main.cpp
-    con_socket.cpp
-    con_socket.h
+    tcp_server.cpp
+    tcp_server.h
     pos_socket.cpp
     pos_socket.h
     msg_conv.cpp
@@ -30,6 +29,8 @@ SET(KPSERVER_SRC_FILES
     net_master.h
     net_slave.cpp
     net_slave.h
+    net_session_player.cpp
+    net_session_player.h
     transform_entity.cpp
     transform_entity.h
     world_instance.cpp
@@ -46,35 +47,35 @@ SET(KPSERVER_SRC_FILES
     pos_session.cpp
     world_snapshot.h
     world_snapshot.cpp
+    hash.cpp
+    hash.h
+    process_stats.h
+    tcp_client.cpp
+    tcp_client.h
 )
 
 if(WIN32)
-SET(KPSERVER_SRC
-${KPSERVER_SRC_FILES}
-)
+    set(KPSERVER_SRC
+        ${KPSERVER_SRC_FILES}
+    )
+
 elseif(APPLE)
-SET(KPSERVER_SRC
-${KPSERVER_SRC_FILES}
-)
+    set(KPSERVER_SRC
+        ${KPSERVER_SRC_FILES}
+    )
 elseif(UNIX)
-SET(KPSERVER_SRC
-${KPSERVER_SRC_FILES}
-)
+    set(KPSERVER_SRC
+        ${KPSERVER_SRC_FILES}
+    )
 endif()
 
 
-ADD_EXECUTABLE(kpserver
-${KPSERVER_SRC}
-)
+add_executable(kpserver ${KPSERVER_SRC} )
 
 if(WIN32)
-TARGET_LINK_LIBRARIES(kpserver ws2_32 )
-
+    target_link_libraries(kpserver ws2_32 pdh )
 elseif(APPLE)
-
-target_link_libraries(kpserver -static-libstdc++)
-
+    target_link_libraries(kpserver -static-libstdc++)
 elseif(UNIX)
-
-TARGET_LINK_LIBRARIES(kpserver dl -static-libstdc++)
+    target_link_libraries(kpserver dl -static-libstdc++)
 endif()

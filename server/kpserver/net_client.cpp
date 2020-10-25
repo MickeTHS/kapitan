@@ -177,15 +177,6 @@ void Net_client::print() const {
 	_info.print();
 }
 
-void Net_client::print_byte_buffer(uint8_t *buffer, int length) {
-	std::string debugOut;
-
-	for (int i = 0; i < length; ++i) {
-		debugOut += " " + std::to_string((uint8_t)buffer[i]);
-	}
-
-	//printf("%s\n", debugOut.c_str());
-}
 
 /* call this in infinite loop */
 void Net_client::read() {

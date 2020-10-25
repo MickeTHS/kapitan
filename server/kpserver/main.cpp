@@ -33,12 +33,15 @@
 
 #include <chrono>
 
-#include "con_socket.h"
+#include "tcp_server.h"
 #include "pos_socket.h"
 #include "net_session.h"
 #include "world_instance.h"
 #include "ini_file.h"
 #include "net_master.h"
+#include "net_slave.h"
+#include "process_stats.h"
+
 
 void print_byte_buffer(uint8_t *buffer, int length) {
 	std::string debugOut;
@@ -74,28 +77,41 @@ int main(int argc , char *argv[])
     Ini_file ini(ini_filename);
     ini.read();
 
-    if (ini.node == nullptr) {
-        printf("ERROR on startup: ini file missing [MASTER] or [SLAVE]\n");
+    auto node = ini.get_me();
+
+    if (node == nullptr) {
+        printf("ERROR on startup: ini file missing is_me\n");
         return 0;
     }
 
-    Con_socket tcp(ini.node->port);
+    Tcp_server tcp(node->port);
 
     std::vector<std::shared_ptr<Net_session>> sessions;
 
-    if (ini.node->is_master) {
+    std::shared_ptr<Net_master> master_node = nullptr;
+    std::shared_ptr<Net_slave> slave_node = nullptr;
+
+    std::shared_ptr<Process_stats> stats = std::make_shared<Process_stats>();
+
+    if (node->is_master) {
         printf("[MAIN][MASTER][STARTUP]\n");
 
         // master nodes doesnt start groups
 
-        std::shared_ptr<Net_master> master = std::make_shared<Net_master>(&tcp);
+        master_node = std::make_shared<Net_master>(&tcp, ini);
+
+        tcp.set_on_new_client_callback([&](std::shared_ptr<Net_client> client) {
+            master_node->on_client_connect(client);
+        });
     }
     else {
         printf("[MAIN][SLAVE][STARTUP]\n");
 
-        for (int i = 0; i < ini.node->max_groups; ++i) {
+        slave_node = std::make_shared<Net_slave>(&tcp, ini, stats);
 
-            std::shared_ptr<Net_session> session = std::make_shared<Net_session>(ini.node->id + (1 + i), ini.node->max_users_per_group, &tcp, ini.node->udp_range_min + i);
+        for (int i = 0; i < node->max_groups; ++i) {
+
+            std::shared_ptr<Net_session> session = std::make_shared<Net_session>(node->id + (1 + i), node->max_users_per_group, &tcp, node->udp_range_min + i);
             sessions.push_back(session);
 
             tcp.set_on_new_client_callback([&](std::shared_ptr<Net_client> client) {
@@ -109,42 +125,61 @@ int main(int argc , char *argv[])
     
     bool run = true;
 
+    auto start_update = std::chrono::high_resolution_clock::now();
+
+    int ticks_per_second = 30;
+    uint64_t milliseconds_tickcount = (int)(1000.0f / (float)ticks_per_second);
+    uint64_t duration = 0;
+    int64_t idle_time = 0;
+
+    uint64_t test = 0;
+
+    if (master_node != nullptr) {
+        //if (master_node->init)
+    }
+    else if (slave_node != nullptr) {
+        if (!slave_node->init()) {
+            printf("[SLAVE][MAIN][ERROR][Unable to initialize Net-Slave]\n");
+            return 0;
+        }
+    }
+
     while (run) {
-        tcp.read(ini.node->port);
+        start_update = std::chrono::high_resolution_clock::now();
+
+        tcp.read(node->port);
 
         for (auto session : sessions) {
             session->read();
         }
-        
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        /*
-        auto start = std::chrono::high_resolution_clock::now(); 
 
-        int source = -1;
-        int len = -1;
-
-        // listen for CON messages, always
-        if ((source = tcp.listen_socket(tcp.con_socket(), buffer, 2000, len)) != -1) {
-
-            memset(sendbuffer, 0, 2000);
-            memcpy(sendbuffer, buffer, len);
-            
+        if (slave_node != nullptr) {
+            slave_node->update();
+        }
+        else if (master_node != nullptr) {
+            master_node->update();
         }
 
-        // only listen for POS if we have established POS connection
-        if ((source = tcp.listen_socket(tcp.pos_socket(), buffer, 2000, len)) != -1) {
-            // do we need to reply to sim server??
-            // forward to vis computers
+        for (uint64_t i = 0; i < 100000000; ++i) {
+            test = ((test * 44) * test) / 10000;
         }
-
-        // make sure that the execution cycle is fixed around 10000 microseconds
-        auto stop = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-        int sleep_ms = 10000 - duration.count();
         
-        if (sleep_ms > 0) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
-        }*/
+        auto now = std::chrono::high_resolution_clock::now();
+        duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_update).count();
+        idle_time = milliseconds_tickcount - duration;
+
+        // the entire tick cycle took duration milliseconds
+        // we want a tick to only fire every milliseconds_tickcount, so we need to sleep the rest of the time
+        
+        stats->add_tick_idle_timing(idle_time);
+
+        if (idle_time > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(idle_time));
+            stats->is_overloaded = false;
+        }
+        else {
+            stats->is_overloaded = true;
+        }
     }
 
     return 0;

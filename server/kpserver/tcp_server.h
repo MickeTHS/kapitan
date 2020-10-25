@@ -35,19 +35,21 @@
 
 #include "net_client.h"
 
+/// http://beej.us/guide/bgnet/html/
+
 #define CON_SOCKET_DESCR 0
 #define CHAT_SOCKET_DESCR 1
 
-struct Con_socket {
-    Con_socket(int con_port);
-    virtual ~Con_socket();
+struct Tcp_server {
+    Tcp_server(int con_port);
+    virtual ~Tcp_server();
 
     bool init();
     int read(int con_port);
     int sendto_client(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data);
     void set_on_new_client_callback(std::function<void(std::shared_ptr<Net_client>)> func);
     void set_on_data_callback(std::function<void(std::shared_ptr<Net_client>, const std::vector<uint8_t>& data)> func);
-
+    bool send_data_to_all(const std::vector<uint8_t>& data, size_t len);
 private:
     void print_error();
 

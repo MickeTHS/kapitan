@@ -7,8 +7,12 @@
 #include <chrono>
 
 struct World_player_entity {
+    World_player_entity();
+    virtual ~World_player_entity();
+
     uint32_t net_client_id;
-    uint16_t entity_id;
+    uint16_t session_entity_id; // the player ID within the session
+    uint32_t session_id; // the session id the player belongs to, if 0 not set
 
     glm::vec3 last_pos;
     glm::quat last_rot;

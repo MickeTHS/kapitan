@@ -9,26 +9,30 @@ Ini_node::Ini_node() {
     max_users_per_group = 6;
     max_groups = 50;
     port = 8888;
-    is_main = false;
     is_master = false;
     udp_range_max = 2900;
     udp_range_min = 2500;
+    keepalive_time_seconds = 60;
+    ticks_per_second_internal = 20;
+    ticks_per_second_position_update_sends = 20;
+    slave_sync_interval_seconds = 60;
+    master_password = 0;
+    is_me = false;
 }
 
 void Ini_node::print() const {
-    if (is_main && is_master) {
+    if (is_master) {
         printf("[MASTER]\n");
     }
     else {
         printf("[SLAVE]\n");
     }
 
-    printf("name: %s, hostname: %s, id: %d, port: %d, is_main: %s, is_master: %s, udp_range_max: %d, udp_range_min: %d\n", 
+    printf("name: %s, hostname: %s, id: %d, port: %d, master: %s, udp_range_max: %d, udp_range_min: %d\n", 
         name.c_str(),
         hostname.c_str(),
         id,
         port,
-        is_main ? "Yes" : "No",
         is_master ? "Yes" : "No",
         udp_range_max,
         udp_range_min
@@ -36,7 +40,7 @@ void Ini_node::print() const {
 }
 
 void Ini_node::write(std::ofstream& outfile) {
-    if (is_main && is_master) {
+    if (is_master) {
         outfile << "[MASTER]" << std::endl;
     }
     else {
@@ -51,11 +55,47 @@ void Ini_node::write(std::ofstream& outfile) {
     outfile << "max_groups:" << max_groups << std::endl;
     outfile << "udp_range_min:" << udp_range_min << std::endl;
     outfile << "udp_range_max:" << udp_range_max << std::endl;
+    outfile << "keepalive_time_seconds:" << keepalive_time_seconds << std::endl;
+    outfile << "ticks_per_second_internal:" << ticks_per_second_internal << std::endl;
+    outfile << "ticks_per_second_position_update_sends:" << ticks_per_second_position_update_sends << std::endl;
+    outfile << "slave_sync_interval_seconds:" << slave_sync_interval_seconds << std::endl;
+    outfile << "master_password:" << master_password << std::endl;
+    outfile << "is_me:" << (is_me ? "yes" : "no") << std::endl;
     outfile << "" << std::endl;
 }
 
 Ini_file::Ini_file (const std::string& filename) {
     _filepath = filename;
+}
+
+std::shared_ptr<Ini_node> Ini_file::get_master() const {
+    for (auto node : nodes) {
+        if (node->is_master) {
+            return node;
+        }
+    }
+
+    return nullptr;
+}
+
+std::shared_ptr<Ini_node> Ini_file::get_me() const {
+    for (auto node : nodes) {
+        if (node->is_me) {
+            return node;
+        }
+    }
+
+    return nullptr;
+}
+
+void Ini_file::get_slaves(std::vector<std::shared_ptr<Ini_node>>& slaves) const {
+    auto me = get_me();
+
+    for (auto node : nodes) {
+        if (node != me) {
+            slaves.push_back(node);
+        }
+    }
 }
 
 void Ini_file::print_help() {
@@ -66,14 +106,8 @@ bool Ini_file::save() {
     std::ofstream outfile;
     outfile.open(_filepath);
 
-    if (node == nullptr) {
-        printf("ERROR: impossible to save ini file\n");
-        return false;
-    }
 
-    node->write(outfile);
-
-    for (auto n : children) {
+    for (auto n : nodes) {
         n->write(outfile);
     }
 
@@ -102,24 +136,17 @@ bool Ini_file::read() {
         if (line.find("[MASTER]") != std::string::npos) {
             keys.clear();
             current_node = std::make_shared<Ini_node>();
-            node = current_node;
-            node->is_master = true;
-            node->is_main = true;
+            nodes.push_back(current_node);
+            
+            current_node->is_master = true;
         }
         else if (line.find("[SLAVE]") != std::string::npos) {
             keys.clear();
             current_node = std::make_shared<Ini_node>();
             
-            if (node != nullptr && node->is_main) {
-                children.push_back(current_node);
-                current_node->is_main = false;
-                current_node->is_master = false;
-            }
-            else {
-                node = current_node;
-                node->is_main = true;
-                node->is_master = false;
-            }
+            nodes.push_back(current_node);
+
+            current_node->is_master = false;
         }
 
         std::istringstream is_line(line);
@@ -148,11 +175,27 @@ bool Ini_file::read() {
         else if (key == "max_groups") {
             current_node->max_groups = stoi(value);
         }
+        else if (key == "keepalive_time_seconds") {
+            current_node->keepalive_time_seconds = stoi(value);
+        }
+        else if (key == "master_password") {
+            current_node->master_password = std::stoull(value, nullptr, 10);
+        }
+        else if (key == "ticks_per_second_internal") {
+            current_node->ticks_per_second_internal = stoi(value);
+        }
+        else if (key == "ticks_per_second_position_update_sends") {
+            current_node->ticks_per_second_position_update_sends = stoi(value);
+        }
+        else if (key == "slave_sync_interval_seconds") {
+            current_node->slave_sync_interval_seconds = stoi(value);
+        }
+        else if (key == "is_me") {
+            current_node->is_me = value == "yes";
+        }
     }
 
-    node->print();
-
-    for (auto n : children) {
+    for (auto n : nodes) {
         n->print();
     }
 

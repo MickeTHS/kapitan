@@ -38,11 +38,11 @@ void Pos_session::on_pos_inc_data(const Net_pos& pos) {
 }
 
 void Pos_session::add_player(std::shared_ptr<World_player_entity> player) {
-    _players[player->entity_id] = player;
+    _players[player->session_entity_id] = player;
 }
 
 void Pos_session::remove_player(std::shared_ptr<World_player_entity> player) {
-    _players.erase(_players.find(player->entity_id));
+    _players.erase(_players.find(player->session_entity_id));
 }
 
 void Pos_session::update() {
@@ -68,7 +68,7 @@ void Pos_session::update() {
 
             if (time_since_last_input.count() >= _disconnect_player_after_milliseconds_inactivity) {
                 // disconnect player
-                _net_session->disconnect(player.second->entity_id);
+                _net_session->disconnect(player.second->session_entity_id);
             }
         }
     }
