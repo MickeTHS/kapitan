@@ -13,8 +13,8 @@
 
 uint32_t Net_client::__ID_COUNTER = 0;
 
-Net_client::Net_client(Net_client_info info, uint32_t id) {
-	_info = info;
+Net_client::Net_client(Net_client_info info_, uint32_t id) : _num_flooded_packets(0) {
+	info = info_;
 	_id = id;
 
 	send_buffer.resize(BUFFER_SIZE);
@@ -27,16 +27,16 @@ Net_client::Net_client(Net_client_info info, uint32_t id) {
 Net_client::~Net_client() {
 	
 #ifdef WIN32
-	WSACleanup();
-	shutdown(_info.socket, SD_SEND);
-	closesocket(_info.socket);
+	//WSACleanup();
+	shutdown(info.socket, SD_BOTH);
+	closesocket(info.socket);
 #else
 	close(_info.socket);
 #endif
 }
 
 std::string Net_client::get_ip() const {
-	return _info.ip;
+	return info.ip;
 }
 
 bool Net_client::request_buffer_size(uint32_t size) const {
@@ -165,16 +165,29 @@ void Net_client::handle_rec_packet(uint8_t* data, int msglen) {
 	*/
 }
 
+bool Net_client::log_activity() {
+	
+	auto now = std::chrono::high_resolution_clock::now();
+	
+	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - _prev_activity).count();
+
+	if (duration < 33) {
+		_num_flooded_packets++;
+	}
+
+	return _num_flooded_packets < 20;
+}
+
 int Net_client::mseconds_since_activity() const {
     return 0;
 }
 
 SOCKET Net_client::get_socket() const {
-	return _info.socket;
+	return info.socket;
 }
 
 void Net_client::print() const {
-	_info.print();
+	info.print();
 }
 
 

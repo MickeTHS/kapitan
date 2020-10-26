@@ -32,6 +32,8 @@
 #include <vector>
 #include <memory>
 #include <functional>
+#include <chrono>
+#include <unordered_map>
 
 #include "net_client.h"
 
@@ -45,28 +47,33 @@ struct Tcp_server {
     virtual ~Tcp_server();
 
     bool init();
-    int read(int con_port);
+    int read();
     int sendto_client(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data);
-    void set_on_new_client_callback(std::function<void(std::shared_ptr<Net_client>)> func);
-    void set_on_data_callback(std::function<void(std::shared_ptr<Net_client>, const std::vector<uint8_t>& data)> func);
+    void set_on_client_connect_callback(std::function<void(std::shared_ptr<Net_client>)> func);
+    void set_on_client_disconnect_callback(std::function<void(std::shared_ptr<Net_client>)> func);
+    void set_on_data_callback(std::function<void(std::shared_ptr<Net_client>, const std::vector<uint8_t>& data, int32_t len)> func);
     bool send_data_to_all(const std::vector<uint8_t>& data, size_t len);
+    void disconnect(std::shared_ptr<Net_client> client);
 private:
     void print_error();
 
     int _con_port;
     
     SOCKET _master_socket;
-    SOCKET _client_socket[30];
-
+    
     struct sockaddr_in _address;
     int _addrlen;
     
     int _max_clients;
+    int _clear_tick_counter;
 
     std::vector<std::shared_ptr<Net_client>> _clients;
 
-    std::function<void(std::shared_ptr<Net_client>)> _on_new_client;
-    std::function<void(std::shared_ptr<Net_client>, const std::vector<uint8_t>& data)> _on_data;
+    std::function<void(std::shared_ptr<Net_client>)> _on_connect;
+    std::function<void(std::shared_ptr<Net_client>)> _on_disconnect;
+    std::function<void(std::shared_ptr<Net_client>, const std::vector<uint8_t>& data, int32_t len)> _on_data;
+
+    std::unordered_map<uint64_t, bool> _blocked_clients;
 
     std::vector<uint8_t> _data_buffer;
 };

@@ -34,7 +34,8 @@ struct Tcp_client {
     bool init(const char* hostname, int port);
     int read_data(std::vector<uint8_t>& buffer);
     bool send_data(const std::vector<uint8_t>& buffer, int len);
-
+    void disconnect();
+    bool is_initialized() const;
 private:
     void print_error();
 

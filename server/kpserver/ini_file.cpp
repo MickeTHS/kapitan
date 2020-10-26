@@ -17,6 +17,7 @@ Ini_node::Ini_node() {
     ticks_per_second_position_update_sends = 20;
     slave_sync_interval_seconds = 60;
     master_password = 0;
+    client_password = 0;
     is_me = false;
 }
 
@@ -61,6 +62,7 @@ void Ini_node::write(std::ofstream& outfile) {
     outfile << "slave_sync_interval_seconds:" << slave_sync_interval_seconds << std::endl;
     outfile << "master_password:" << master_password << std::endl;
     outfile << "is_me:" << (is_me ? "yes" : "no") << std::endl;
+    outfile << "client_password:" << client_password << std::endl;
     outfile << "" << std::endl;
 }
 
@@ -192,6 +194,9 @@ bool Ini_file::read() {
         }
         else if (key == "is_me") {
             current_node->is_me = value == "yes";
+        }
+        else if (key == "client_password") {
+            current_node->client_password = std::stoull(value, nullptr, 10);
         }
     }
 

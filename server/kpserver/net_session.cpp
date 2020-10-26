@@ -36,6 +36,15 @@ void Net_session::keepalive() {
     _last_keepalive = std::chrono::high_resolution_clock::now();
 }
 
+void Net_session::disconnect(std::shared_ptr<Net_client> client) {
+    for (int i = 0; i < _clients.size(); ++i) {
+        if (_clients[i] == client) {
+            _clients.erase(_clients.begin() + i);
+            return;
+        }
+    }
+}
+
 void Net_session::generate_session_code() {
     char alfa[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ\0";
     int len = strlen(alfa);
@@ -67,9 +76,7 @@ void Net_session::disconnect(uint16_t entity_id) {
 }
 
 void Net_session::handle_inc_pos(const std::vector<uint8_t>& data) {
-    Net_pos pos;
-
-    pos.from_buffer(data);
+    Net_pos pos(data, 0);
 
     if (_on_pos != nullptr) {
         _on_pos(pos);

@@ -24,15 +24,16 @@
 #include <sys/types.h>
 #include <time.h>
 #include <stdio.h>
+#include <errno.h>
 #endif
 
 #include "net_packet.h"
 
-Pos_socket::Pos_socket(int port) {
-    _port = port;
-	_socket = -1;
-
-	printf("[POS-UDP][OK][p: %d]\n", port);
+Pos_socket::Pos_socket(int port)
+	:	_port(port),
+		_socket(-1),
+		_on_data(nullptr)
+	{
 
 	// set up destination address 
 	memset(&_addr, 0, sizeof(_addr));
@@ -42,13 +43,11 @@ Pos_socket::Pos_socket(int port) {
 	_addrlen = sizeof(_addr);
 
 	_recv_buffer.resize(1024);
-
-	_on_data = nullptr;
 }
 
 Pos_socket::~Pos_socket() {
 #ifdef WIN32
-	WSACleanup();
+	//WSACleanup();
 	shutdown(_socket, SD_SEND);
 	closesocket(_socket);
 #else
@@ -57,6 +56,7 @@ Pos_socket::~Pos_socket() {
 }
 
 void Pos_socket::print_error() {
+#ifdef WIN32
 	wchar_t* s = NULL;
 	FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
 		NULL, WSAGetLastError(),
@@ -64,6 +64,9 @@ void Pos_socket::print_error() {
 		(LPWSTR)&s, 0, NULL);
 	fprintf(stderr, "%S\n", s);
 	LocalFree(s);
+#else
+	printf("Error: %s\n", strerror(errno));
+#endif
 }
 
 bool Pos_socket::init() {
@@ -87,7 +90,7 @@ bool Pos_socket::init() {
 		printf("[POS-UDP][INIT][SOCKET][FAIL]\n");
 		
 #ifdef WIN32
-		WSACleanup();
+		//WSACleanup();
 #endif
 		return false;
 	}
@@ -97,7 +100,7 @@ bool Pos_socket::init() {
 	if (setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, (const char*)&yes, sizeof(yes)) < 0) {
 		printf("[POS-UDP][INIT][REUSEADDR][FAIL]\n");
 
-		WSACleanup();
+		//WSACleanup();
 
 		return false;
 	}
@@ -125,7 +128,7 @@ bool Pos_socket::init() {
 	if (::bind(_socket, (struct sockaddr*)&_addr, sizeof(_addr)) < 0) {
 		printf("[POS-UDP][INIT][BIND][FAIL]\n");
 #ifdef WIN32
-		WSACleanup();
+		//WSACleanup();
 #endif
 		return false;
 	}
@@ -160,10 +163,6 @@ int Pos_socket::read() {
 #ifdef WIN32
 	while ((nbytes = recvfrom(_socket, (char*)&_recv_buffer[0], _recv_buffer.size(), 0, (struct sockaddr *) &_addr, &_addrlen)) >= 0) {
 		printf("[POS-UDP][READ][l: %d][p: %d]\n", nbytes, ntohs(_addr.sin_port));
-
-		Net_pos pos;
-		pos.from_buffer(_recv_buffer);
-		pos.print();
 
 		if (_on_data != nullptr) {
 			_on_data(_recv_buffer);

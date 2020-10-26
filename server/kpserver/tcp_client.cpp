@@ -55,7 +55,7 @@ bool Tcp_client::init(const char* hostname, int port) {
         printf("[TCP-CLIENT][INIT][ERROR][Connection error]\n");
         print_error();
         
-        WSACleanup();
+        //WSACleanup();
 
         return false; 
     } 
@@ -101,6 +101,8 @@ bool Tcp_client::send_data(const std::vector<uint8_t>& buffer, int len) {
         print_error();
         return false;
     }
+
+    printf("OK\n");
 
     return true;
 }
@@ -185,6 +187,8 @@ int Tcp_client::read_data(std::vector<uint8_t>& buffer) {
                 printf("[TCP-CLIENT][READ][ERROR][WSAECONNRESET]\n");
                 break;
             default:
+                // fault on the master, try to reconnect
+                disconnect();
                 printf("[TCP-CLIENT][READ][ERROR][%d]\n", valread);
                 print_error();
                 break;
@@ -197,4 +201,20 @@ int Tcp_client::read_data(std::vector<uint8_t>& buffer) {
     }
 
     return 0;
+}
+
+void Tcp_client::disconnect() {
+#ifdef WIN32
+    //WSACleanup();
+    shutdown(_socket, SD_SEND);
+    closesocket(_socket);
+#else
+    close(_socket);
+#endif
+
+    _initialized = false;
+}
+
+bool Tcp_client::is_initialized() const {
+    return _initialized;
 }

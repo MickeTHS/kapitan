@@ -99,26 +99,13 @@ int main(int argc , char *argv[])
         // master nodes doesnt start groups
 
         master_node = std::make_shared<Net_master>(&tcp, ini);
-
-        tcp.set_on_new_client_callback([&](std::shared_ptr<Net_client> client) {
-            master_node->on_client_connect(client);
-        });
     }
     else {
         printf("[MAIN][SLAVE][STARTUP]\n");
 
         slave_node = std::make_shared<Net_slave>(&tcp, ini, stats);
+        slave_node->setup_sessions();
 
-        for (int i = 0; i < node->max_groups; ++i) {
-
-            std::shared_ptr<Net_session> session = std::make_shared<Net_session>(node->id + (1 + i), node->max_users_per_group, &tcp, node->udp_range_min + i);
-            sessions.push_back(session);
-
-            tcp.set_on_new_client_callback([&](std::shared_ptr<Net_client> client) {
-                session->add_client(client);
-                session->send_config();
-            });
-        }
     }
     
     tcp.init();
@@ -147,7 +134,7 @@ int main(int argc , char *argv[])
     while (run) {
         start_update = std::chrono::high_resolution_clock::now();
 
-        tcp.read(node->port);
+        tcp.read();
 
         for (auto session : sessions) {
             session->read();
@@ -160,7 +147,7 @@ int main(int argc , char *argv[])
             master_node->update();
         }
 
-        for (uint64_t i = 0; i < 100000000; ++i) {
+        for (uint64_t i = 0; i < 1000000; ++i) {
             test = ((test * 44) * test) / 10000;
         }
         

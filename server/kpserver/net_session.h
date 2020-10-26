@@ -29,6 +29,7 @@ struct Net_session {
     void disconnect(uint16_t entity_id);
     void generate_session_code();
     void keepalive();
+    void disconnect(std::shared_ptr<Net_client> client);
 
     char session_code[16];
     mmh::Hash_key session_code_hash;

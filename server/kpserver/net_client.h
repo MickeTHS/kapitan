@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <string>
 #include <vector>
+#include <chrono>
 
 #ifdef WIN32
 
@@ -26,6 +27,12 @@
 #include <stdio.h>
 #endif
 
+enum class NetClientType {
+	Unauthenticated = 0,
+	SlaveNode,
+	Player
+};
+
 
 #define MSG_BUF_SIZE 20000
 
@@ -34,11 +41,22 @@ struct Net_client_info {
 		ip = "";
 		port = 0;
 		socket = -1;
+		type = NetClientType::Unauthenticated;
+		session_id = 0;
+		client_id = 0;
 	}
 
     std::string ip;
     int port;
+	uint64_t int_ip;
+
 	SOCKET socket;
+	NetClientType type;
+
+
+	uint32_t session_id;
+	uint32_t client_id;
+
 
 	void print() const {
 		printf("[NET-CLIENT][fd: %d][p: %d][ip: %s]\n", socket, port, ip.c_str());
@@ -48,7 +66,7 @@ struct Net_client_info {
 struct Net_client {
 	static uint32_t __ID_COUNTER;
 
-    Net_client(Net_client_info info, uint32_t id);
+    Net_client(Net_client_info info_, uint32_t id);
 	virtual ~Net_client();
 
 	void handle_rec_packet(uint8_t* data, int msglen);
@@ -64,16 +82,20 @@ struct Net_client {
 	void print() const;
 
 	uint32_t get_id() const;
+
+	bool log_activity();
 	
 	std::vector<uint8_t> send_buffer;
 	uint32_t buffer_pos;
+	Net_client_info     info;
+
 private:
-	
-    Net_client_info     _info;
 	
 	struct	sockaddr_in _addr;
     struct  ip_mreq     _mreq;
 	int					_addrlen;
 	uint32_t			_id;
-	
+	int					_num_flooded_packets;
+
+	std::chrono::steady_clock::time_point _prev_activity;
 };

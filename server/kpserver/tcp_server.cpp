@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <thread>
+#include <errno.h>
 
 #define FD_INVALID -1
 
@@ -12,14 +13,26 @@ void connection_info(struct sockaddr_in& client, Net_client_info& info)
 
     std::cout << "-[IP:" << connected_ip << ", Connected on PORT:" << port << "]" << std::endl;
 
+    info.int_ip = ntohl(client.sin_addr.s_addr);
     info.ip = std::string(connected_ip);
     info.port = port;
 }
 
 
-Tcp_server::Tcp_server(int con_port) {
-    _con_port = con_port;
-    _on_new_client = nullptr;
+Tcp_server::Tcp_server(int con_port) 
+    :   _max_clients(10000),
+        _con_port(con_port),
+        _clear_tick_counter(0),
+        _master_socket(0),
+        _addrlen(0),
+        _on_connect(nullptr),
+        _on_disconnect(nullptr),
+        _address({ 0 })
+{
+    _address.sin_family = AF_INET;
+    _address.sin_addr.s_addr = INADDR_ANY;
+    _address.sin_port = htons(_con_port);
+
     _data_buffer.resize(2000);
 }
 
@@ -27,16 +40,19 @@ Tcp_server::~Tcp_server() {
 
 }
 
-void Tcp_server::set_on_new_client_callback(std::function<void(std::shared_ptr<Net_client>)> func) {
-    _on_new_client = func;
+void Tcp_server::set_on_client_connect_callback(std::function<void(std::shared_ptr<Net_client>)> func) {
+    _on_connect = func;
 }
 
-void Tcp_server::set_on_data_callback(std::function<void(std::shared_ptr<Net_client>, const std::vector<uint8_t>& data)> func) {
+void Tcp_server::set_on_client_disconnect_callback(std::function<void(std::shared_ptr<Net_client>)> func) {
+    _on_disconnect = func;
+}
+
+void Tcp_server::set_on_data_callback(std::function<void(std::shared_ptr<Net_client>, const std::vector<uint8_t>& data, int32_t len)> func) {
     _on_data = func;
 }
 
 void Tcp_server::print_error() {
-
 #ifdef WIN32
     wchar_t* s = NULL;
     FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
@@ -45,6 +61,8 @@ void Tcp_server::print_error() {
         (LPWSTR)&s, 0, NULL);
     fprintf(stderr, "%S\n", s);
     LocalFree(s);
+#else
+    printf("Error: %s\n", strerror(errno));
 #endif
 }
 
@@ -52,13 +70,7 @@ bool Tcp_server::init() {
     printf("[CON-TCP][INIT]\n");
     int opt = TRUE;
     int new_socket, i;
-    _max_clients = 30;
 
-    //initialise all client_socket[] to 0 so not checked  
-    for (i = 0; i < _max_clients; i++)
-    {
-        _client_socket[i] = 0;
-    }
 
 #ifdef WIN32
     WSADATA wsaData;
@@ -92,12 +104,7 @@ bool Tcp_server::init() {
         exit(EXIT_FAILURE);
     }
 
-    //type of socket created  
-    _address.sin_family = AF_INET;
-    _address.sin_addr.s_addr = INADDR_ANY;
-    _address.sin_port = htons(_con_port);
-
-    //bind the socket to localhost port 8888  
+    //bind the socket to localhost port con_port  
     if (bind(_master_socket, (struct sockaddr*)&_address, sizeof(_address)) < 0)
     {
         printf("[CON-TCP][INIT][FAIL][BIND]:\n");
@@ -106,9 +113,8 @@ bool Tcp_server::init() {
         exit(EXIT_FAILURE);
     }
     
-
-    //try to specify maximum of 3 pending connections for the master socket  
-    if (listen(_master_socket, 3) < 0)
+    //try to specify maximum of 100 pending connections for the master socket  
+    if (listen(_master_socket, 100) < 0)
     {
         printf("[CON-TCP][INIT][FAIL][LISTEN]:\n");
         print_error();
@@ -119,17 +125,15 @@ bool Tcp_server::init() {
     int option = 1;
 #ifdef WIN32
     if (setsockopt(_master_socket, SOL_SOCKET, SO_REUSEADDR, (const char*)&option, sizeof(option)) < 0) {
-        WSACleanup();
+        //WSACleanup();
         printf("[CON-TCP][INIT][FAIL][REUSEADDR]:\n");
         print_error();
         return false;
     }
 #else 
     setsockopt(master_socket, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
-
 #endif 
 
-    //accept the incoming connection  
     _addrlen = sizeof(_address);
     printf("[CON-TCP][INIT][OK][p: %d]\n", _con_port);
 
@@ -149,8 +153,14 @@ int Tcp_server::sendto_client(std::shared_ptr<Net_client> client, const std::vec
     return 0;
 }
 
-int Tcp_server::read(int con_port) {
-    //set of socket descriptors  
+int Tcp_server::read() {
+    // clear our block list every once in a while
+    if (_clear_tick_counter++ > 100) {
+        _blocked_clients.clear();
+        _clear_tick_counter = 0;
+    }
+
+    //set of socket descriptors
     fd_set readfds;
     int max_sd;
     int i;
@@ -161,145 +171,143 @@ int Tcp_server::read(int con_port) {
     SOCKET new_socket;
 
     char buffer[1025];  //data buffer of 1K  
-    //a message  
     
-    //while (TRUE)
-    //{
-        //clear the socket set  
-        FD_ZERO(&readfds);
+    FD_ZERO(&readfds);
 
-        //add master socket to set  
-        FD_SET(_master_socket, &readfds);
-        max_sd = _master_socket;
+    //add master socket to set  
+    FD_SET(_master_socket, &readfds);
+    max_sd = _master_socket;
 
-        //add child sockets to set  
-        for (i = 0; i < _max_clients; i++)
+    for (auto client : _clients) {
+        sd = client->get_socket();
+
+        if (sd > 0) {
+            FD_SET(sd, &readfds);
+        }
+            
+        //highest file descriptor number, need it for the select function  
+        if (sd > max_sd) {
+            max_sd = sd;
+        }
+    }
+
+    timeval tt;
+    tt.tv_sec = 0;
+    tt.tv_usec = 1000;
+
+    //wait for an activity on one of the sockets , timeout is NULL ,  
+    //so wait indefinitely  
+    activity = select(max_sd + 1, &readfds, NULL, NULL, &tt);
+
+
+    if ((activity < 0) && (errno != EINTR))
+    {
+        printf("[CON-TCP][READ][SELECT][FAIL][h:%s][p:%d][l:%d]\n");
+        print_error();
+    }
+
+    //If something happened on the master socket ,  
+    //then its an incoming connection  
+    if (FD_ISSET(_master_socket, &readfds))
+    {
+        if ((new_socket = accept(_master_socket,
+            (struct sockaddr*)&_address, (socklen_t*)&_addrlen)) < 0)
         {
-            //socket descriptor  
-            sd = _client_socket[i];
-
-            //if valid socket descriptor then add to read list  
-            if (sd > 0)
-                FD_SET(sd, &readfds);
-
-            //highest file descriptor number, need it for the select function  
-            if (sd > max_sd)
-                max_sd = sd;
+            printf("[CON-TCP][READ][ACCEPT][FAIL][h:%s][p:%d][l:%d]\n");
+            exit(EXIT_FAILURE);
         }
 
-        timeval tt;
-        tt.tv_sec = 0;
-        tt.tv_usec = 1000;
+        //inform user of socket number - used in send and receive commands  
+        //printf("New connection, socket fd is %d , ip is : %s , port : %d \n" , new_socket, inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
 
-        //wait for an activity on one of the sockets , timeout is NULL ,  
-        //so wait indefinitely  
-        activity = select(max_sd + 1, &readfds, NULL, NULL, &tt);
+        Net_client_info info;
 
+        connection_info(_address, info);
+        info.socket = new_socket;
 
-        if ((activity < 0) && (errno != EINTR))
-        {
-            printf("[CON-TCP][READ][SELECT][FAIL][h:%s][p:%d][l:%d]\n");
-            print_error();
+        if (_blocked_clients.find(info.int_ip) != _blocked_clients.end()) {
+            printf("Client is blocked\n");
+            shutdown(new_socket, SD_BOTH);
+            closesocket(new_socket);
         }
-
-        //If something happened on the master socket ,  
-        //then its an incoming connection  
-        if (FD_ISSET(_master_socket, &readfds))
-        {
-            if ((new_socket = accept(_master_socket,
-                (struct sockaddr*)&_address, (socklen_t*)&_addrlen)) < 0)
-            {
-                printf("[CON-TCP][READ][ACCEPT][FAIL][h:%s][p:%d][l:%d]\n");
-                exit(EXIT_FAILURE);
-            }
-
-            //inform user of socket number - used in send and receive commands  
-            //printf("New connection, socket fd is %d , ip is : %s , port : %d \n" , new_socket, inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
-
-            Net_client_info info;
-
-            connection_info(_address, info);
-            info.socket = new_socket;
-
+        else {
             printf("[CON-TCP][READ][NEW-CONNECTION][OK]");
             info.print();
 
             std::shared_ptr<Net_client> client = std::make_shared<Net_client>(info, Net_client::__ID_COUNTER++);
             _clients.push_back(client);
 
-            //add new socket to array of sockets  
-            for (i = 0; i < _max_clients; i++)
-            {
-                //if position is empty  
-                if (_client_socket[i] == 0)
-                {
-                    _client_socket[i] = new_socket;
-                    
-                    break;
-                }
-            }
-
-            if (_on_new_client != nullptr) {
-                _on_new_client(client);
+            if (_on_connect != nullptr) {
+                _on_connect(client);
             }
         }
+    }
 
-        for (auto client : _clients) {
-            sd = client->get_socket();
+    //for (auto client : _clients) {
+    for (int i = 0; i < _clients.size(); ++i) {
+        auto client = _clients[i];
 
-            if (FD_ISSET(sd, &readfds)) {
-                if ((valread = recv(sd, (char*)&_data_buffer[0], 1024, 0)) == 0)
-                {
-                    //Somebody disconnected , get his details and print  
-                    getpeername(sd, (struct sockaddr*)&_address, (socklen_t*)&_addrlen);
-                    printf("[CON-TCP][READ][DISCONNECT][OK][ip: %s][p: %d]\n", inet_ntoa(_address.sin_addr), ntohs(_address.sin_port));
+        sd = client->get_socket();
 
-                    //Close the socket and mark as 0 in list for reuse  
-                    closesocket(sd);
-                    _client_socket[i] = 0;
+        if (FD_ISSET(sd, &readfds)) {
+            valread = recv(sd, (char*)&_data_buffer[0], 1024, 0);
+
+            switch (valread) {
+                case -1:
+                case 0:
+                case WSAENOTCONN:
+                case WSAENOTSOCK:
+                case WSAESHUTDOWN:
+                case WSAECONNABORTED:
+                case WSAECONNRESET:
+                    printf("disconnected\n");
+                    disconnect(client);
+                    --i;
+                    continue;
+            }
+
+            if (valread == 1024) { // force shutdown for buffer overflow
+                disconnect(client);
+                _blocked_clients[client->info.int_ip] = true;
+                --i;
+                continue;
+            }
+
+            if (valread > 0) {
+                printf("read: %d\n", valread);
+                if (!client->log_activity()) { // force shutdown for package flooding
+                    printf("Disconnect due to packet flooding\n");
+                    disconnect(client);
+                    _blocked_clients[client->info.int_ip] = true;
+                    --i;
+                    continue;
                 }
-                else {
-                    // parse the message
-                    if (_on_data != nullptr) {
-                        printf("data received: %d, first bytes: %d, %d, %d, %d, %d\n", valread, _data_buffer[0], _data_buffer[1], _data_buffer[2], _data_buffer[3], _data_buffer[4]);
-                        _on_data(client, _data_buffer);
-                    }
+
+                // parse the message
+                if (_on_data != nullptr) {
+                    _on_data(client, _data_buffer, valread);
                 }
             }
         }
-
-        //else its some IO operation on some other socket 
-        /*for (i = 0; i < _max_clients; i++)
-        {
-            sd = _client_socket[i];
-
-            if (FD_ISSET(sd, &readfds))
-            {
-                //Check if it was for closing , and also read the  
-                //incoming message  
-                if ((valread = recv(sd, buffer, 1024, 0)) == 0)
-                {
-                    //Somebody disconnected , get his details and print  
-                    getpeername(sd, (struct sockaddr*)&_address, (socklen_t*)&_addrlen);
-                    printf("[CON-TCP][READ][DISCONNECT][OK][ip: %s][p: %d]\n", inet_ntoa(_address.sin_addr), ntohs(_address.sin_port));
-
-                    //Close the socket and mark as 0 in list for reuse  
-                    closesocket(sd);
-                    _client_socket[i] = 0;
-                }
-                //Echo back the message that came in  
-                else
-                {
-                    //set the string terminating NULL byte on the end  
-                    //of the data read  
-                    //buffer[valread] = '\0';
-                    //send(sd, buffer, strlen(buffer), 0);
-                }
-            }
-        }*/
-    //}
+    }
 
     return 0;
+}
+
+void Tcp_server::disconnect(std::shared_ptr<Net_client> client) {
+    // destructor of Net_client deals with disconnects
+    // closesocket(client->get_socket());
+
+    for (int i = 0; i < _clients.size(); ++i) {
+        if (_clients[i] == client) {
+            _clients.erase(_clients.begin() + i);
+            return;
+        }
+    }
+
+    if (_on_disconnect != nullptr) {
+        _on_disconnect(client);
+    }
 }
 
 

@@ -11,8 +11,6 @@ Net_session_player::Net_session_player() {
     net_player_id = 0;
     net_client_id = 0;
     node_slave_id = 0;
-
-
 }
 
 Net_session_player::~Net_session_player() {

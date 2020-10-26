@@ -23,6 +23,7 @@ struct Ini_node {
     uint32_t ticks_per_second_position_update_sends; // how often we send position/player updates
     uint32_t slave_sync_interval_seconds;
     uint64_t master_password;
+    uint64_t client_password;
 
     bool is_me;
     bool is_master;
