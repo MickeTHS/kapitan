@@ -13,8 +13,8 @@
 /// Keeps track of the player positions in a session
 /// must update per tick to send out the latest position updates
 ///
-struct Pos_session {
-    Pos_session(std::shared_ptr<Net_session> net_session, int disconnect_player_after_milliseconds_inactivity);
+struct Udp_session {
+    Udp_session(std::shared_ptr<Net_session> net_session, int disconnect_player_after_milliseconds_inactivity);
 
     void add_player(std::shared_ptr<World_player_entity> player);
     void remove_player(std::shared_ptr<World_player_entity> player);

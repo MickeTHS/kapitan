@@ -1,4 +1,4 @@
-#include "pos_socket.h"
+#include "udp_server.h"
 
 #include <stdio.h>
 #include <string>
@@ -29,7 +29,7 @@
 
 #include "net_packet.h"
 
-Pos_socket::Pos_socket(int port)
+Udp_server::Udp_server(int port)
 	:	_port(port),
 		_socket(-1),
 		_on_data(nullptr)
@@ -45,7 +45,7 @@ Pos_socket::Pos_socket(int port)
 	_recv_buffer.resize(1024);
 }
 
-Pos_socket::~Pos_socket() {
+Udp_server::~Udp_server() {
 #ifdef WIN32
 	//WSACleanup();
 	shutdown(_socket, SD_SEND);
@@ -55,7 +55,7 @@ Pos_socket::~Pos_socket() {
 #endif
 }
 
-void Pos_socket::print_error() {
+void Udp_server::print_error() {
 #ifdef WIN32
 	wchar_t* s = NULL;
 	FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
@@ -69,7 +69,7 @@ void Pos_socket::print_error() {
 #endif
 }
 
-bool Pos_socket::init() {
+bool Udp_server::init() {
 	printf("[POS-UDP][INIT]\n");
 
 	int	 nbytes, addrlen;
@@ -152,11 +152,11 @@ bool Pos_socket::init() {
     return true;
 }
 
-void Pos_socket::set_on_data(std::function<void(const std::vector<uint8_t>&)> func) {
+void Udp_server::set_on_data(std::function<void(const std::vector<uint8_t>&)> func) {
 	_on_data = func;
 }
 
-int Pos_socket::read() {
+int Udp_server::read() {
 	
 	int nbytes;
 
@@ -177,11 +177,11 @@ int Pos_socket::read() {
     return 0;
 }
 
-int Pos_socket::send(const std::vector<uint8_t>& data) {
+int Udp_server::send(const std::vector<uint8_t>& data) {
 
 	return 0;
 }
 
-int Pos_socket::get_port() const {
+int Udp_server::get_port() const {
 	return _port;
 }

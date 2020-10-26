@@ -30,9 +30,9 @@
 /// Handles the position messages
 /// 
 
-struct Pos_socket {
-    Pos_socket(int port);
-    virtual ~Pos_socket();
+struct Udp_server {
+    Udp_server(int port);
+    virtual ~Udp_server();
 
     bool init();
     int read();

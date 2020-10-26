@@ -1,6 +1,6 @@
-#include "pos_session.h"
+#include "udp_session.h"
 
-Pos_session::Pos_session(std::shared_ptr<Net_session> net_session, int disconnect_player_after_milliseconds_inactivity) {
+Udp_session::Udp_session(std::shared_ptr<Net_session> net_session, int disconnect_player_after_milliseconds_inactivity) {
     _net_session = net_session;
     _disconnect_player_after_milliseconds_inactivity = disconnect_player_after_milliseconds_inactivity;
 
@@ -13,7 +13,7 @@ Pos_session::Pos_session(std::shared_ptr<Net_session> net_session, int disconnec
     _last_tick = std::chrono::high_resolution_clock::now();
 }
 
-void Pos_session::on_pos_inc_data(const Net_pos& pos) {
+void Udp_session::on_pos_inc_data(const Net_pos& pos) {
     // on pos data received
     auto player = _players.find(pos.entity);
 
@@ -37,15 +37,15 @@ void Pos_session::on_pos_inc_data(const Net_pos& pos) {
     player->second->last_input_ts = std::chrono::high_resolution_clock::now();
 }
 
-void Pos_session::add_player(std::shared_ptr<World_player_entity> player) {
+void Udp_session::add_player(std::shared_ptr<World_player_entity> player) {
     _players[player->session_entity_id] = player;
 }
 
-void Pos_session::remove_player(std::shared_ptr<World_player_entity> player) {
+void Udp_session::remove_player(std::shared_ptr<World_player_entity> player) {
     _players.erase(_players.find(player->session_entity_id));
 }
 
-void Pos_session::update() {
+void Udp_session::update() {
     auto now = std::chrono::high_resolution_clock::now();
 
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(now - _last_tick);

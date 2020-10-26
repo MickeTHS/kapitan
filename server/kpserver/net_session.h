@@ -7,7 +7,7 @@
 #include <chrono>
 
 #include "net_client.h"
-#include "pos_socket.h"
+#include "udp_server.h"
 #include "net_packet.h"
 #include "world_instance.h"
 #include "hash.h"
@@ -43,7 +43,7 @@ private:
 
     Tcp_server* _tcp_server;
 
-    std::shared_ptr<Pos_socket> _pos_socket;
+    std::shared_ptr<Udp_server> _udp_server;
     std::shared_ptr<World_instance> _world;
 
     std::function<void(const Net_pos&)> _on_pos;

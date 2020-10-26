@@ -15,8 +15,8 @@ set(KPSERVER_SRC_FILES
     main.cpp
     tcp_server.cpp
     tcp_server.h
-    pos_socket.cpp
-    pos_socket.h
+    udp_server.cpp
+    udp_server.h
     msg_conv.cpp
     msg_conv.h
     net_client.cpp
@@ -43,8 +43,8 @@ set(KPSERVER_SRC_FILES
     world_mission_entity.h
     ini_file.cpp
     ini_file.h
-    pos_session.h
-    pos_session.cpp
+    udp_session.h
+    udp_session.cpp
     world_snapshot.h
     world_snapshot.cpp
     hash.cpp

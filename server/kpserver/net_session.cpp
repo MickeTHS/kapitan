@@ -16,16 +16,16 @@ Net_session::Net_session(uint32_t id, int max_clients, Tcp_server* tcp_server, i
 
     _world = std::make_shared<World_instance>();
 
-    _pos_socket = std::make_shared<Pos_socket>(p);
+    _udp_server = std::make_shared<Udp_server>(p);
 
-    if (_pos_socket->init()) {
+    if (_udp_server->init()) {
         printf("[NET-SESSION][OK][id: %d][POS-UDP: %d]\n", _id, p);
     }
     else {
         printf("[NET-SESSION][FAIL][id: %d][POS-UDP: %d]\n", _id, p);
     }
     
-    _pos_socket->set_on_data([&](const std::vector<uint8_t>& data) {
+    _udp_server->set_on_data([&](const std::vector<uint8_t>& data) {
         on_udp_data(data);
     });
 }
@@ -103,7 +103,7 @@ bool Net_session::send_config() {
 
     strcpy(config.hostname, "localhost");
     config.group_id = _id;
-    config.pos_port = _pos_socket->get_port();
+    config.pos_port = _udp_server->get_port();
     
 
     std::vector<uint8_t> data;
@@ -122,6 +122,6 @@ bool Net_session::send_pos() {
 }
 
 int Net_session::read() {
-    return _pos_socket->read();
+    return _udp_server->read();
 }
 
