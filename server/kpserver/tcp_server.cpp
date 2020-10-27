@@ -68,11 +68,12 @@ void Tcp_server::print_error() {
 
 bool Tcp_server::init() {
     printf("[CON-TCP][INIT]\n");
-    int opt = TRUE;
+
     int new_socket, i;
 
-
 #ifdef WIN32
+    int opt = TRUE;
+    
     WSADATA wsaData;
 
     int wsa_result = WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -83,6 +84,8 @@ bool Tcp_server::init() {
 
         return false;
     }
+#else 
+    int opt = 1;
 #endif
 
     //create a master socket  
@@ -131,7 +134,7 @@ bool Tcp_server::init() {
         return false;
     }
 #else 
-    setsockopt(master_socket, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
+    setsockopt(_master_socket, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
 #endif 
 
     _addrlen = sizeof(_address);
@@ -215,8 +218,12 @@ int Tcp_server::read() {
 
         if (_blocked_clients.find(info.int_ip) != _blocked_clients.end()) {
             printf("Client is blocked\n");
+#ifdef WIN32
             shutdown(new_socket, SD_BOTH);
             closesocket(new_socket);
+#else
+            close(new_socket);
+#endif
         }
         else {
             printf("[CON-TCP][READ][NEW-CONNECTION][OK]");
