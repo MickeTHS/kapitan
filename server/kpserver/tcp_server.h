@@ -19,15 +19,17 @@
 #define SOCKET int32_t
 #endif
 
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
-#include <stdio.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 #include <time.h>
-#include <stdio.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #endif
 

@@ -25,6 +25,9 @@
 #include <time.h>
 #include <stdio.h>
 #include <errno.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 #endif
 
 #include "net_packet.h"
