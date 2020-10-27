@@ -1,5 +1,7 @@
 #include "world_player_entity.h"
 
+#include <string.h>
+
 World_player_entity::World_player_entity() {
     session_id = 0;
     session_entity_id = 0;
