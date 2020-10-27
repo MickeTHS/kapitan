@@ -9,6 +9,10 @@
 #include <unistd.h>
 #endif
 
+#ifndef SOCKET_ERROR
+#define SOCKET_ERROR -1
+#endif
+
 #define BUFFER_SIZE 2000
 
 uint32_t Net_client::__ID_COUNTER = 0;
