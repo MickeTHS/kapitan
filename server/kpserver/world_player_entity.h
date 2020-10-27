@@ -20,5 +20,5 @@ struct World_player_entity {
     char username[64];
     char avatar[32];
 
-    std::chrono::steady_clock::time_point last_input_ts;
+    std::chrono::time_point<std::chrono::high_resolution_clock> last_input_ts;
 };
