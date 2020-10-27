@@ -47,5 +47,5 @@ private:
 
     std::function<void(const Net_pos&)> _on_pos;
 
-    std::chrono::steady_clock::time_point _last_keepalive;
+    std::chrono::time_point<std::chrono::high_resolution_clock> _last_keepalive;
 };
