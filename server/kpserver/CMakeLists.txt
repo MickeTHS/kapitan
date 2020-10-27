@@ -17,8 +17,6 @@ set(KPSERVER_SRC_FILES
     tcp_server.h
     udp_server.cpp
     udp_server.h
-    msg_conv.cpp
-    msg_conv.h
     net_client.cpp
     net_client.h
     net_session.cpp
