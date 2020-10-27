@@ -11,6 +11,7 @@
 struct Ini_node {
     std::string name;
     std::string hostname;
+    std::string ip;
     
     uint32_t id;
     uint32_t max_users_per_group;
@@ -26,6 +27,7 @@ struct Ini_node {
 
     bool is_me;
     bool is_master;
+    bool is_ip_set;
 
     Ini_node();
 

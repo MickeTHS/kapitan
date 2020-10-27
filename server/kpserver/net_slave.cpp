@@ -228,7 +228,7 @@ void Net_slave::print_stats() {
 bool Net_slave::connect_to_master() {
     auto master = _ini_file.get_master();
 
-    if (!_master_connection->init(master->hostname.c_str(), master->tcp_port)) {
+    if (!_master_connection->init(master->ip.c_str(), master->hostname.c_str(), master->is_ip_set, master->tcp_port)) {
         printf("[NET-SLAVE][INIT][FATAL ERROR][Unable to init connection to master]\n");
         return false;
     }
@@ -247,7 +247,12 @@ bool Net_slave::connect_to_master() {
 
     // send our configuration
     Net_slave_config config;
-    strcpy(config.hostname, _my_node->hostname.c_str());
+    if (_my_node->is_ip_set) {
+        strcpy(config.hostname, _my_node->hostname.c_str());
+    }
+    else {
+        strcpy(config.hostname, _my_node->ip.c_str());
+    }
     config.tcp_port = _my_node->tcp_port;
     config.udp_port = _my_node->udp_port;
     config.node_id = _my_node->id;

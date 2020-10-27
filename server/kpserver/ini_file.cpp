@@ -4,6 +4,7 @@
 
 Ini_node::Ini_node() {
     hostname = "localhost";
+    ip = "";
     name = "test";
     id = 0;
     max_users_per_group = 6;
@@ -18,6 +19,7 @@ Ini_node::Ini_node() {
     master_password = 0;
     client_password = 0;
     is_me = false;
+    is_ip_set = false;
 }
 
 void Ini_node::print() const {
@@ -48,6 +50,7 @@ void Ini_node::write(std::ofstream& outfile) {
 
     outfile << "name:" << name << std::endl;
     outfile << "hostname:" << hostname << std::endl;
+    outfile << "ip:" << ip << std::endl;
     outfile << "tcp_port:" << tcp_port << std::endl;
     outfile << "udp_port:" << udp_port << std::endl;
     outfile << "id:" << id << std::endl;
@@ -158,6 +161,10 @@ bool Ini_file::read() {
         
         if (key == "hostname") {
             current_node->hostname = value;
+        }
+        else if (key == "ip") {
+            current_node->ip = value;
+            current_node->is_ip_set = true;
         }
         else if (key == "name") {
             current_node->name = value;

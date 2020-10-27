@@ -41,7 +41,7 @@
 struct Tcp_client {
     Tcp_client();
 
-    bool init(const char* hostname, int port);
+    bool init(const char* ip, const char* hostname, bool is_ip_set, int port);
     int read_data(std::vector<uint8_t>& buffer);
     bool send_data(const std::vector<uint8_t>& buffer, int len);
     void disconnect();

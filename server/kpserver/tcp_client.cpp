@@ -2,7 +2,7 @@
 
 Tcp_client::Tcp_client() : _socket(0), _initialized(false) {}
 
-bool Tcp_client::init(const char* hostname, int port) {
+bool Tcp_client::init(const char* ip, const char* hostname, bool is_ip_set, int port) {
     _socket = 0;
 
     struct sockaddr_in serv_addr; 
@@ -20,35 +20,39 @@ bool Tcp_client::init(const char* hostname, int port) {
 #endif
 
     struct hostent* he;
-
-    // resolve hostname
-    if ((he = gethostbyname(hostname)) == NULL) {
-        printf("[TCP-CLIENT][INIT][ERROR][Hostname lookup failed]\n");
-        return false;
-    }
-
-    if ((_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-    { 
-        printf("[TCP-CLIENT][INIT][ERROR][Unable to create socket]\n"); 
-        return false;
-    }
-    
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
-    memcpy(&serv_addr.sin_addr, he->h_addr_list[0], he->h_length);
-    
-    char ip[64];
 
-    inet_ntop(AF_INET, &serv_addr.sin_addr, ip, sizeof(ip));
+    if ((_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        printf("[TCP-CLIENT][INIT][ERROR][Unable to create socket]\n");
+        return false;
+    }
+
+    if (is_ip_set) {
+        if (inet_pton(AF_INET, ip, &serv_addr.sin_addr) <= 0)
+        {
+            printf("[TCP-CLIENT][INIT][ERROR][Unable to format IP address]\n");
+            return false;
+        }
+    }
+    else {
+        // resolve hostname
+        if ((he = gethostbyname(hostname)) == NULL) {
+            printf("[TCP-CLIENT][INIT][ERROR][Hostname lookup failed]\n");
+            return false;
+        }
+
+        memcpy(&serv_addr.sin_addr, he->h_addr_list[0], he->h_length);
+
+#ifdef WIN32
+        inet_ntop(AF_INET, &serv_addr.sin_addr, (PSTR)ip, strlen(ip));
+#else
+        inet_ntop(AF_INET, &serv_addr.sin_addr, ip, strlen(ip));
+#endif
+    }
 
     printf("[TCP-CLIENT][INIT][Ip of remote server: %s]\n", ip);
-
-    // Convert IPv4 and IPv6 addresses from text to binary form 
-/*  if (inet_pton(AF_INET, ip, &serv_addr.sin_addr) <= 0)  
-    { 
-        printf("[TCP-CLIENT][INIT][ERROR][Unable to format IP address]\n"); 
-        return false; 
-    } */
    
     if (connect(_socket, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
     { 
