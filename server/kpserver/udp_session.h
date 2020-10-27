@@ -26,7 +26,7 @@ private:
 
     float _tickrate; // updates per second
     long _tick_microseconds;
-    std::chrono::steady_clock::time_point _last_tick;
+    std::chrono::time_point<std::chrono::high_resolution_clock> _last_tick;
 
     int _pos_check;
     int _disconnect_player_after_milliseconds_inactivity;
