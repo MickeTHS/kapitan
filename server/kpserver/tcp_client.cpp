@@ -48,7 +48,7 @@ bool Tcp_client::init(const char* ip, const char* hostname, bool is_ip_set, int 
 #ifdef WIN32
         inet_ntop(AF_INET, &serv_addr.sin_addr, (PSTR)ip, strlen(ip));
 #else
-        inet_ntop(AF_INET, &serv_addr.sin_addr, ip, strlen(ip));
+        inet_ntop(AF_INET, &serv_addr.sin_addr, (char*)ip, strlen(ip));
 #endif
     }
 
