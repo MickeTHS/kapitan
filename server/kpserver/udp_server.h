@@ -38,20 +38,30 @@
 #include <vector>
 #include <stdint.h>
 #include <functional>
+#include <memory>
+#include <unordered_map>
+#include "net_client.h"
+#include "net_packet.h"
 
 ///
 /// Handles the position messages
 /// 
 
+struct Net_session_player;
+
 struct Udp_server {
-    Udp_server(int port);
+    Udp_server();
     virtual ~Udp_server();
 
-    bool init();
+    bool init(int port);
     int read();
-    int send(const std::vector<uint8_t>& data);
+    int send(const std::vector<Net_client*>& clients, const std::vector<uint8_t>& data, uint32_t len);
+    int session_send(const std::vector<Net_session_player*>& players, int num_players, const std::vector<uint8_t>& data, uint32_t data_len);
     int get_port() const;
-    void set_on_data_callback(std::function<void(const std::vector<uint8_t>&, int32_t)> func);
+    void set_on_client_data_callback(std::function<void(Net_client*, const std::vector<uint8_t>&, int32_t)> func);
+    void set_on_client_connect_callback(std::function<void(Net_client*, const Net_Udp_establish&)> func);
+    void establish_client_connection(Net_client* client);
+    void remove_client(Net_client* client);
 
 private:
     void print_error();
@@ -64,5 +74,9 @@ private:
 
     std::vector<uint8_t> _recv_buffer;
 
-    std::function<void(const std::vector<uint8_t>&, int32_t)> _on_data;
+    std::function<void(Net_client*, const Net_Udp_establish&)> _on_client_connect;
+    std::function<void(Net_client*, const std::vector<uint8_t>&, int32_t)> _on_client_data;
+
+    std::unordered_map<uint64_t, Net_client*> _client_hash_map;
+    std::unordered_map<uint32_t, Net_client*> _client_id_map;
 };

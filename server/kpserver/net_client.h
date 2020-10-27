@@ -56,20 +56,29 @@ struct Net_client_info {
 		type = NetClientType::Unauthenticated;
 		session_id = 0;
 		client_id = 0;
+		udp_code = 0;
+		udp_port = 0;
+		udp_established = false;
+		quick_hash = 0;
 	}
 
     std::string ip;
     int port;
-	uint64_t int_ip;
+	uint32_t int_ip;
 
 	SOCKET tcp_socket;
 	SOCKET udp_socket;
 	NetClientType type;
 
+	struct	sockaddr_in udp_addr;
+	socklen_t           udp_addr_len;
+	bool				udp_established;
 
+	uint64_t quick_hash;
 	uint32_t session_id;
 	uint32_t client_id;
-
+	uint16_t udp_code;
+	uint16_t udp_port;
 
 	void print() const {
 		printf("[NET-CLIENT][fd: %d][p: %d][ip: %s]\n", socket, port, ip.c_str());
@@ -94,6 +103,8 @@ struct Net_client {
 	std::string get_ip() const;
 
     int mseconds_since_activity() const;
+
+	void generate_udp_code();
 
 	void print() const;
 

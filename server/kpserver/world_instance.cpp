@@ -9,11 +9,13 @@ World_instance::~World_instance() {
 }
 
 void World_instance::on_player_pos(const Net_pos& pos) {
-    if (entities[pos.entity] == nullptr) {
+    /*if (entities[pos.entity] == nullptr) {
         return;
     }
 
-    entities[pos.entity]->set_inc_pos(pos);
+    entities[pos.entity]->set_inc_pos(pos);*/
+
+    
 }
 
 void World_instance::add_player(uint16_t player_id) {

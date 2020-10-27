@@ -14,7 +14,7 @@ void connection_info(struct sockaddr_in& client, Net_client_info& info)
 
     std::cout << "-[IP:" << connected_ip << ", Connected on PORT:" << port << "]" << std::endl;
 
-    info.int_ip = ntohl(client.sin_addr.s_addr);
+    info.int_ip = (uint32_t)ntohl(client.sin_addr.s_addr);
     info.ip = std::string(connected_ip);
     info.port = port;
 }
@@ -41,15 +41,15 @@ Tcp_server::~Tcp_server() {
 
 }
 
-void Tcp_server::set_on_client_connect_callback(std::function<void(std::shared_ptr<Net_client>)> func) {
+void Tcp_server::set_on_client_connect_callback(std::function<void(Net_client*)> func) {
     _on_connect = func;
 }
 
-void Tcp_server::set_on_client_disconnect_callback(std::function<void(std::shared_ptr<Net_client>)> func) {
+void Tcp_server::set_on_client_disconnect_callback(std::function<void(Net_client*)> func) {
     _on_disconnect = func;
 }
 
-void Tcp_server::set_on_data_callback(std::function<void(std::shared_ptr<Net_client>, const std::vector<uint8_t>& data, int32_t len)> func) {
+void Tcp_server::set_on_client_data_callback(std::function<void(Net_client*, const std::vector<uint8_t>& data, int32_t len)> func) {
     _on_data = func;
 }
 
@@ -161,8 +161,6 @@ int Tcp_server::read() {
 
     SOCKET sd;
     SOCKET new_socket;
-
-    char buffer[1025];  //data buffer of 1K  
     
     FD_ZERO(&readfds);
 
@@ -170,8 +168,8 @@ int Tcp_server::read() {
     FD_SET(_master_socket, &readfds);
     max_sd = _master_socket;
 
-    for (auto client : _clients) {
-        sd = client->get_tcp_socket();
+    for (int i = 0; i < _clients.size(); ++i) {
+        sd = _clients[i]->get_tcp_socket();
 
         if (sd > 0) {
             FD_SET(sd, &readfds);
@@ -191,7 +189,6 @@ int Tcp_server::read() {
     //so wait indefinitely  
     activity = select(max_sd + 1, &readfds, NULL, NULL, &tt);
 
-
     if ((activity < 0) && (errno != EINTR))
     {
         printf("[CON-TCP][READ][SELECT][FAIL][h:%s][p:%d][l:%d]\n");
@@ -208,9 +205,6 @@ int Tcp_server::read() {
             printf("[CON-TCP][READ][ACCEPT][FAIL][h:%s][p:%d][l:%d]\n");
             exit(EXIT_FAILURE);
         }
-
-        //inform user of socket number - used in send and receive commands  
-        //printf("New connection, socket fd is %d , ip is : %s , port : %d \n" , new_socket, inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
 
         Net_client_info info;
 
@@ -230,18 +224,20 @@ int Tcp_server::read() {
             printf("[CON-TCP][READ][NEW-CONNECTION][OK]");
             info.print();
 
-            std::shared_ptr<Net_client> client = std::make_shared<Net_client>(info, Net_client::__ID_COUNTER++);
-            _clients.push_back(client);
+            std::unique_ptr<Net_client> client = std::make_unique<Net_client>(info, Net_client::__ID_COUNTER++);
+            Net_client* client_ptr = client.get();
+
+            _clients.push_back(std::move(client));
 
             if (_on_connect != nullptr) {
-                _on_connect(client);
+                _on_connect(client_ptr);
             }
         }
     }
 
     //for (auto client : _clients) {
     for (int i = 0; i < _clients.size(); ++i) {
-        auto client = _clients[i];
+        auto client = _clients[i].get();
 
         sd = client->get_tcp_socket();
 
@@ -273,6 +269,7 @@ int Tcp_server::read() {
 
             if (valread > 0) {
                 printf("read: %d\n", valread);
+
                 if (!client->log_activity()) { // force shutdown for package flooding
                     printf("Disconnect due to packet flooding\n");
                     disconnect(client);
@@ -292,25 +289,24 @@ int Tcp_server::read() {
     return 0;
 }
 
-void Tcp_server::disconnect(std::shared_ptr<Net_client> client) {
+void Tcp_server::disconnect(Net_client* client) {
     // destructor of Net_client deals with disconnects
-    // closesocket(client->get_socket());
-
-    for (int i = 0; i < _clients.size(); ++i) {
-        if (_clients[i] == client) {
-            _clients.erase(_clients.begin() + i);
-            return;
-        }
-    }
-
+    
     if (_on_disconnect != nullptr) {
         _on_disconnect(client);
+    }
+
+    for (int i = 0; i < _clients.size(); ++i) {
+        if (_clients[i].get() == client) {
+            _clients.erase(_clients.begin() + i);
+            break;
+        }
     }
 }
 
 void Tcp_server::send_client_data() {
-    for (auto client : _clients) {
-        client->send_tcp_data();
+    for (int i = 0; i < _clients.size(); ++i) {
+        _clients[i]->send_tcp_data();
     }
 }
 
@@ -320,8 +316,8 @@ bool Tcp_server::send_data_to_all(const std::vector<uint8_t>& data, size_t len) 
     size_t bytes_sent;
     bool success = true;
 
-    for (auto client : _clients) {
-        sd = client->get_tcp_socket();
+    for (int i = 0; i < _clients.size(); ++i) {
+        sd = _clients[i].get()->get_tcp_socket();
         if ((bytes_sent = send(sd, (const char*)&data[0], len, 0)) != len) {
             printf("[CON-TCP][SEND_DATA_TO_ALL][ERROR][Unable to send to client socket]\n");
             success = false;

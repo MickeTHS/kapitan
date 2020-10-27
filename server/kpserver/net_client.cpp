@@ -3,6 +3,7 @@
 #include <string>
 #include <stdio.h>
 #include <string.h>
+#include <cstdlib>
 
 #ifndef WIN32
 #include <sys/socket.h>
@@ -51,6 +52,11 @@ std::string Net_client::get_ip() const {
 	return info.ip;
 }
 
+void Net_client::generate_udp_code() {
+	srand(time(NULL));
+
+	info.udp_code = rand() % USHRT_MAX;
+}
 
 void Net_client::add_tcp_data(void* data, uint32_t len) {
 	memcpy(&_tcp_data_buffer[_tcp_data_buffer_pos], data, len);

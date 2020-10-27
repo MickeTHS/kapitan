@@ -13,8 +13,8 @@
 enum class MsgType {
     None = -1,
     GroupConfig = 0,
-    PlayerPos = 1,
-    OtherPos = 2,
+    NetPlayerPos = 1,
+    NetOtherPos = 2,
     NetPlayerRequestSlaveNode,
     NetSlaveConfig,
     NetSlaveSessionSummary,
@@ -30,7 +30,10 @@ enum class MsgType {
     NetPlayerLeaveSession,
     NetError,
     NetSlaveHealthReport,
-    NetPlayerSetGameRuleInt
+    NetPlayerSetGameRuleInt,
+    NetUDPEstablish,
+    NetUDPClientConnectionInfo,
+    NetPlayerChat
 };
 
 enum class NetErrorType {
@@ -55,6 +58,52 @@ struct Net_error {
         error = (uint8_t)error_type;
     }
 
+};
+
+
+/// <summary>
+/// Sent from player to slave in order to map the client UDP connection to a Net_client
+/// </summary>
+struct Net_Udp_establish {
+    uint8_t type;
+    uint16_t code;
+    uint32_t client_id;
+
+    Net_Udp_establish() : type((uint8_t)MsgType::NetUDPEstablish), code(0), client_id(0) {
+    
+    }
+
+    Net_Udp_establish(const std::vector<uint8_t>& data, uint32_t offset) {
+        memcpy(this, &data[offset], sizeof(Net_Udp_establish));
+    }
+
+    void set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
+        memcpy(&data[offset], this, sizeof(Net_Udp_establish));
+    }
+};
+
+/// <summary>
+/// Notify the client that we have a reserved connection slot for UDP data
+/// using the credentials listed below
+/// </summary>
+struct Net_Udp_client_connection_info {
+    uint8_t type;
+    uint16_t code;
+    uint32_t client_id;
+    uint16_t port;
+    char ip[64];
+
+    Net_Udp_client_connection_info() : type((uint8_t)MsgType::NetUDPClientConnectionInfo), code(0), client_id(0), port(0) {
+        memset(ip, 0, 64);
+    }
+
+    Net_Udp_client_connection_info(const std::vector<uint8_t>& data, uint32_t offset) {
+        memcpy(this, &data[offset], sizeof(Net_Udp_client_connection_info));
+    }
+
+    void set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
+        memcpy(&data[offset], this, sizeof(Net_Udp_client_connection_info));
+    }
 };
 
 //// ############# END COMMON PACKETS ############ ////
@@ -516,17 +565,30 @@ struct Net_snapshot_player {
 };
 
 /// <summary>
+/// We will only forward chat messages
+/// </summary>
+struct Net_chat {
+    uint8_t type;
+    uint16_t len;
+    char* message;
+
+    Net_chat() : type((uint8_t)MsgType::NetPlayerChat), len(0), message(0) {
+    
+    }
+};
+
+/// <summary>
 /// Player position and rotation
 /// </summary>
 struct Net_pos {
     uint8_t     type;
-    uint8_t     entity;
+    uint8_t     player_short_id;
     uint16_t    pos[3];
     uint8_t     rot[7];
 
     Net_pos() {
-        type = (uint8_t)MsgType::PlayerPos;
-        entity = 0;
+        type = (uint8_t)MsgType::NetPlayerPos;
+        player_short_id = 0;
     }
 
     Net_pos(const std::vector<uint8_t>& data, uint32_t offset) {
@@ -538,7 +600,7 @@ struct Net_pos {
     }
 
     void print() {
-        printf("[MSG-POS][E: %d][x: %d][y: %d][z: %d]\n", entity, pos[0], pos[1], pos[2]);
+        printf("[MSG-POS][E: %d][x: %d][y: %d][z: %d]\n", player_short_id, pos[0], pos[1], pos[2]);
         printf("[MSG-POS][DEBUG][x: %f][y: %f][z: %f]\n", ((float)pos[0]) / 100.0f, ((float)pos[1]) / 100.0f, ((float)pos[2]) / 100.0f);
     }
 };

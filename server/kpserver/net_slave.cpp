@@ -17,33 +17,60 @@ Net_slave::Net_slave(Tcp_server* tcp, const Ini_file& file, std::shared_ptr<Proc
     _master_connection = std::make_shared<Tcp_client>();
     _data_buffer.resize(2000);
 
-    _udp = std::make_shared<Udp_server>(_my_node->udp_port);
-    _udp->init();
+    _udp.init(_my_node->udp_port);
 
-    _udp->set_on_data_callback([&](const std::vector<uint8_t>& data, int32_t data_len){
-        on_inc_client_udp_data(nullptr, data, data_len);
+    _udp.set_on_client_data_callback([&](Net_client* client, const std::vector<uint8_t>& data, int32_t data_len){
+        on_inc_client_udp_data(client, data, data_len);
     });
 
-    _tcp->set_on_data_callback([&](std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data, int32_t data_len) {
+    _tcp->set_on_client_data_callback([&](Net_client* client, const std::vector<uint8_t>& data, int32_t data_len) {
         on_inc_client_tcp_data(client, data, data_len);
     });
 
-    _tcp->set_on_client_connect_callback([&](std::shared_ptr<Net_client> client) {
+    _tcp->set_on_client_connect_callback([&](Net_client* client) {
         on_client_connect(client);
     });
 
-    _tcp->set_on_client_disconnect_callback([&](std::shared_ptr<Net_client> client) {
+    _tcp->set_on_client_disconnect_callback([&](Net_client* client) {
         on_client_disconnect(client);
     });
 }
 
 Net_slave::~Net_slave() {}
 
-void Net_slave::on_inc_client_udp_data(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data, int32_t data_len) {
+void Net_slave::on_inc_client_udp_data(Net_client* client, const std::vector<uint8_t>& data, int32_t data_len) {
     // handle incoming UDP data from players
+    int32_t len = data_len;
+    uint32_t off = 0;
+
+    while (len > 0) {
+        MsgType type = (MsgType)(uint8_t)data[off];
+
+        switch (type) {
+        
+            case MsgType::NetPlayerPos:
+            {
+                Net_pos pos(data, off);
+
+                off += sizeof(Net_pos);
+                len -= sizeof(Net_pos);
+
+                // we got an updated player position
+                // so we have to update the Net_session_player position values
+
+                break;
+            }
+            case MsgType::NetPlayerChat:
+            {
+                //Net_chat()
+                break;
+            }
+            default: return;
+        }
+    }
 }
 
-void Net_slave::on_inc_client_tcp_data(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data, int32_t data_len) {
+void Net_slave::on_inc_client_tcp_data(Net_client* client, const std::vector<uint8_t>& data, int32_t data_len) {
     // incoming TCP data from clients/players
 
     MsgType type = MsgType::None;
@@ -132,12 +159,16 @@ bool Net_slave::init() {
 void Net_slave::setup_sessions() {
 
     for (int i = 0; i < _my_node->max_groups; ++i) {
-        std::shared_ptr<Net_session> session = std::make_shared<Net_session>(_my_node->id + (1 + i), _my_node->max_users_per_group, _tcp, _my_node->udp_port);
-        _sessions.push_back(session);
+        auto sess = std::make_unique<Net_session>(
+            _my_node->id + (1 + i),
+            _my_node->max_users_per_group,
+            _tcp,
+            &_udp);
+        _sessions.push_back(std::move(sess));
     }
 }
 
-void Net_slave::on_client_connect(std::shared_ptr<Net_client> client) {
+void Net_slave::on_client_connect(Net_client* client) {
     // tcp.set_on_new_client_callback([&](std::shared_ptr<Net_client> client) {
     // session->add_client(client);
     // session->send_config();
@@ -145,11 +176,20 @@ void Net_slave::on_client_connect(std::shared_ptr<Net_client> client) {
     // create a new net session player
     auto player = std::make_shared<Net_session_player>();
     player->net_client_id = client->info.client_id;
-
     _client_id_lookup[client->info.client_id] = player;
+
+    _udp.establish_client_connection(client);
+
+    // send a request to the client to connect to our UDP port
+    Net_Udp_client_connection_info udpconn;
+    udpconn.client_id = client->info.client_id;
+    strcpy(udpconn.ip, _my_node->ip.c_str());
+    udpconn.port = _my_node->udp_port;
+    
+    client->add_tcp_data((void*)&udpconn, sizeof(Net_Udp_client_connection_info));
 }
 
-void Net_slave::on_client_disconnect(std::shared_ptr<Net_client> client) {
+void Net_slave::on_client_disconnect(Net_client* client) {
     // when a client has disconnected, we need to make sure we delete all references to the client object
 
     // delete the client
@@ -159,8 +199,11 @@ void Net_slave::on_client_disconnect(std::shared_ptr<Net_client> client) {
 
     // remove player from the session
     if (client->info.session_id != 0 && _session_id_lookup.find(client->info.session_id) != _session_id_lookup.end()) {
-        _session_id_lookup[client->info.session_id]->disconnect(client);
+        _session_id_lookup[client->info.session_id]->disconnect(client->info.client_id);
     }
+
+    // remove the player from the UDP server lookup tables
+    _udp.remove_client(client);
 }
 
 void Net_slave::handle_master_command(const Net_master_to_slave_command& command) {
@@ -253,6 +296,7 @@ bool Net_slave::connect_to_master() {
     else {
         strcpy(config.hostname, _my_node->ip.c_str());
     }
+
     config.tcp_port = _my_node->tcp_port;
     config.udp_port = _my_node->udp_port;
     config.node_id = _my_node->id;

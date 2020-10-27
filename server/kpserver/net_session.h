@@ -5,45 +5,61 @@
 #include <stdint.h>
 #include <functional>
 #include <chrono>
+#include <unordered_map>
 
-#include "net_client.h"
-#include "udp_server.h"
 #include "net_packet.h"
 #include "world_instance.h"
 #include "hash.h"
+#include "net_session_player.h"
 
 struct Tcp_server;
+struct Udp_server;
+struct Net_client_info;
+struct Net_client;
 
 /// a group is a collection of clients that will be playing a private game
 /// that once it has been started, only these clients will be able to 
 /// communicate among each other
 struct Net_session {
-    Net_session(uint32_t id, int max_clients, Tcp_server* tcp_server, int udp_port);
+    Net_session(uint32_t id, int max_players, Tcp_server* tcp_server, Udp_server* udp_server);
+
     virtual ~Net_session();
 
-    bool add_client(std::shared_ptr<Net_client> client);
+    bool add_player(Net_client* info);
+
     int32_t on_tcp_data(const std::vector<uint8_t>& data, uint32_t offset, int32_t len);
+
     int read();
+
     void set_on_pos(std::function<void(const Net_pos&)> func);
-    void disconnect(uint16_t entity_id);
+
     void generate_session_code();
+
     void keepalive();
-    void disconnect(std::shared_ptr<Net_client> client);
+
+    void disconnect(uint32_t client_id);
+
+    bool is_full() const;
+
+    void broadcast(const std::vector<uint8_t>& data, uint32_t len);
 
     char session_code[16];
     mmh::Hash_key session_code_hash;
 private:
     void handle_inc_pos(const std::vector<uint8_t>& data);
+
     void on_udp_data(const std::vector<uint8_t>& data, int32_t data_len);
 
-    std::vector<std::shared_ptr<Net_client>> _clients;
+    std::vector<Net_session_player> _players;
+
     uint32_t _id;
-    int _max_clients;
+    int _max_players;
+    int _num_players;
 
     Tcp_server* _tcp_server;
+    Udp_server* _udp_server;
 
-    std::shared_ptr<Udp_server> _udp_server;
-    std::shared_ptr<World_instance> _world;
+    World_instance _world;
 
     std::function<void(const Net_pos&)> _on_pos;
 

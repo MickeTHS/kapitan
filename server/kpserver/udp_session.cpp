@@ -15,7 +15,7 @@ Udp_session::Udp_session(std::shared_ptr<Net_session> net_session, int disconnec
 
 void Udp_session::on_pos_inc_data(const Net_pos& pos) {
     // on pos data received
-    auto player = _players.find(pos.entity);
+    auto player = _players.find(pos.player_short_id);
 
     if (player == _players.end()) {
         // did not find player

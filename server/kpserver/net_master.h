@@ -16,11 +16,11 @@
 struct Tcp_server;
 
 struct Net_slave_info {
-    Net_slave_info(std::shared_ptr<Net_client> client_, uint32_t slave_id_);
+    Net_slave_info(Net_client* client_, uint32_t slave_id_);
 
     int32_t health_rating; // negative is bad health
     uint32_t slave_id;
-    std::shared_ptr<Net_client> client;
+    Net_client* client;
 
     void set_health_rating(const Net_slave_health_snapshot& snap) {
         // calculate a health rating used to determine the healthiest node
@@ -40,19 +40,19 @@ struct Net_master {
     Net_master(Tcp_server* tcp, const Ini_file& file);
     virtual ~Net_master();
 
-    std::shared_ptr<Net_slave_info> get_slave(std::shared_ptr<Net_client> client);
+    std::shared_ptr<Net_slave_info> get_slave(Net_client* client);
 
     void update();
     
 private:
-    void add_authenticated_slave(std::shared_ptr<Net_client> client, const Net_authenticate_slave& auth);
+    void add_authenticated_slave(Net_client* client, const Net_authenticate_slave& auth);
 
-    void on_inc_tcp_data(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data, int32_t data_len);
-    void on_client_connect(std::shared_ptr<Net_client> client);
-    void on_client_disconnect(std::shared_ptr<Net_client> client);
+    void on_inc_tcp_data(Net_client* client, const std::vector<uint8_t>& data, int32_t data_len);
+    void on_client_connect(Net_client* client);
+    void on_client_disconnect(Net_client* client);
 
-    void remove_slave(std::shared_ptr<Net_client> client);
-    void remove_player(std::shared_ptr<Net_client> client);
+    void remove_slave(Net_client* client);
+    void remove_player(Net_client* client);
 
     std::unordered_map<uint32_t, std::shared_ptr<Net_session>>      _session_code_lookup; // this is a hash as a key
     std::unordered_map<uint32_t, std::shared_ptr<Net_session>>      _session_id_lookup;

@@ -86,8 +86,6 @@ int main(int argc , char *argv[])
 
     Tcp_server tcp(node->tcp_port);
 
-    std::vector<std::shared_ptr<Net_session>> sessions;
-
     std::shared_ptr<Net_master> master_node = nullptr;
     std::shared_ptr<Net_slave> slave_node = nullptr;
 
@@ -135,10 +133,6 @@ int main(int argc , char *argv[])
         start_update = std::chrono::high_resolution_clock::now();
 
         tcp.read();
-
-        for (auto session : sessions) {
-            session->read();
-        }
 
         if (slave_node != nullptr) {
             slave_node->update();

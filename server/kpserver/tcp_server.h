@@ -61,11 +61,15 @@ struct Tcp_server {
     int read();
     void send_client_data();
 
-    void set_on_client_connect_callback(std::function<void(std::shared_ptr<Net_client>)> func);
-    void set_on_client_disconnect_callback(std::function<void(std::shared_ptr<Net_client>)> func);
-    void set_on_data_callback(std::function<void(std::shared_ptr<Net_client>, const std::vector<uint8_t>& data, int32_t len)> func);
+    void set_on_client_connect_callback(std::function<void(Net_client*)> func);
+
+    void set_on_client_disconnect_callback(std::function<void(Net_client*)> func);
+
+    void set_on_client_data_callback(std::function<void(Net_client*, const std::vector<uint8_t>& data, int32_t len)> func);
+
     bool send_data_to_all(const std::vector<uint8_t>& data, size_t len);
-    void disconnect(std::shared_ptr<Net_client> client);
+
+    void disconnect(Net_client* client);
 private:
     void print_error();
 
@@ -79,11 +83,11 @@ private:
     int _max_clients;
     int _clear_tick_counter;
 
-    std::vector<std::shared_ptr<Net_client>> _clients;
+    std::vector<std::unique_ptr<Net_client>> _clients;
 
-    std::function<void(std::shared_ptr<Net_client>)> _on_connect;
-    std::function<void(std::shared_ptr<Net_client>)> _on_disconnect;
-    std::function<void(std::shared_ptr<Net_client>, const std::vector<uint8_t>& data, int32_t len)> _on_data;
+    std::function<void(Net_client*)> _on_connect;
+    std::function<void(Net_client*)> _on_disconnect;
+    std::function<void(Net_client*, const std::vector<uint8_t>& data, int32_t len)> _on_data;
 
     std::unordered_map<uint64_t, bool> _blocked_clients;
 

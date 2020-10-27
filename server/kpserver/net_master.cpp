@@ -16,15 +16,15 @@ Net_master::Net_master(Tcp_server* tcp, const Ini_file& file) : _ini_file(file) 
     //std::vector<std::shared_ptr<Ini_node>> slaves;
     //file.get_slaves(slaves);
 
-    _tcp->set_on_data_callback([&](std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data, int32_t len) {
+    _tcp->set_on_client_data_callback([&](Net_client* client, const std::vector<uint8_t>& data, int32_t len) {
         on_inc_tcp_data(client, data, len);
     });
 
-    _tcp->set_on_client_connect_callback([&](std::shared_ptr<Net_client> client) {
+    _tcp->set_on_client_connect_callback([&](Net_client* client) {
         on_client_connect(client);
     });
 
-    _tcp->set_on_client_disconnect_callback([&](std::shared_ptr<Net_client> client) {
+    _tcp->set_on_client_disconnect_callback([&](Net_client* client) {
         on_client_disconnect(client);
     });
 }
@@ -33,7 +33,7 @@ Net_master::~Net_master() {
 
 }
 
-void Net_master::on_client_connect(std::shared_ptr<Net_client> client) {
+void Net_master::on_client_connect(Net_client* client) {
     //printf("[NET-MASTER][New slave connected]\n");
     // at this moment we dont know if its a slave or a client
     // wait for authentication
@@ -43,7 +43,7 @@ void Net_master::on_client_connect(std::shared_ptr<Net_client> client) {
     // we must receive a password or we will disconnect the client
 }
 
-void Net_master::on_client_disconnect(std::shared_ptr<Net_client> client) {
+void Net_master::on_client_disconnect(Net_client* client) {
     // when a client has disconnected, we need to make sure we delete all references to the client object
 
     if (client->info.type == NetClientType::SlaveNode) {
@@ -55,7 +55,7 @@ void Net_master::on_client_disconnect(std::shared_ptr<Net_client> client) {
 
 }
 
-void Net_master::remove_slave(std::shared_ptr<Net_client> client) {
+void Net_master::remove_slave(Net_client* client) {
     // delete the client
     if (client->info.client_id != 0 && _client_id_lookup.find(client->info.client_id) != _client_id_lookup.end()) {
         _client_id_lookup.erase(client->info.client_id);
@@ -82,7 +82,7 @@ void Net_master::remove_slave(std::shared_ptr<Net_client> client) {
     }
 }
 
-void Net_master::remove_player(std::shared_ptr<Net_client> client) {
+void Net_master::remove_player(Net_client* client) {
 
     // delete the client
     if (client->info.client_id != 0 && _client_id_lookup.find(client->info.client_id) != _client_id_lookup.end()) {
@@ -91,11 +91,11 @@ void Net_master::remove_player(std::shared_ptr<Net_client> client) {
 
     // remove player from the session
     if (client->info.session_id != 0 && _session_id_lookup.find(client->info.session_id) != _session_id_lookup.end()) {
-        _session_id_lookup[client->info.session_id]->disconnect(client);
+        _session_id_lookup[client->info.session_id]->disconnect(client->info.client_id);
     }
 }
 
-std::shared_ptr<Net_slave_info> Net_master::get_slave(std::shared_ptr<Net_client> client) {
+std::shared_ptr<Net_slave_info> Net_master::get_slave(Net_client* client) {
     if (_slave_by_client_id.find(client->info.client_id) == _slave_by_client_id.end()) {
         return nullptr;
     }
@@ -103,7 +103,7 @@ std::shared_ptr<Net_slave_info> Net_master::get_slave(std::shared_ptr<Net_client
     return _slave_by_client_id[client->info.client_id];
 }
 
-void Net_master::add_authenticated_slave(std::shared_ptr<Net_client> client, const Net_authenticate_slave& auth) {
+void Net_master::add_authenticated_slave(Net_client* client, const Net_authenticate_slave& auth) {
     client->info.type = NetClientType::SlaveNode;
 
     if (_slave_by_slave_id.find(auth.slave_id) != _slave_by_slave_id.end()) {
@@ -121,7 +121,7 @@ void Net_master::add_authenticated_slave(std::shared_ptr<Net_client> client, con
     printf("[NET-MASTER][New slave node registered successfully]\n");
 }
 
-void Net_master::on_inc_tcp_data(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data, int32_t data_len) {
+void Net_master::on_inc_tcp_data(Net_client* client, const std::vector<uint8_t>& data, int32_t data_len) {
     
     uint32_t pos = 0;
     int32_t len = data_len;
@@ -265,7 +265,7 @@ void Net_master::update() {
     }
 }
 
-Net_slave_info::Net_slave_info(std::shared_ptr<Net_client> client_, uint32_t slave_id_) 
+Net_slave_info::Net_slave_info(Net_client* client_, uint32_t slave_id_)
     : client(client_), slave_id(slave_id_), health_rating(-1) {
     
 }
