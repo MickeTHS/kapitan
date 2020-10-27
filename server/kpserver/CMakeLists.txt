@@ -41,10 +41,10 @@ set(KPSERVER_SRC_FILES
     world_mission_entity.h
     ini_file.cpp
     ini_file.h
-    udp_session.h
     udp_session.cpp
-    world_snapshot.h
+    udp_session.h
     world_snapshot.cpp
+    world_snapshot.h
     hash.cpp
     hash.h
     process_stats.h
