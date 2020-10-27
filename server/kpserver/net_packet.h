@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 #include <stdio.h>
+#include <string.h>
 
 #pragma pack(push, 1)
 
