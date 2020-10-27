@@ -2,11 +2,13 @@ cmake_minimum_required(VERSION 3.2)
 project(kpserver)
 set (CMAKE_BUILD_TYPE Release)
 
+set(CMAKE_CXX_STANDARD 14)
+
 if(WIN32)
     add_definitions(-DWIN32)
 else(WIN32)
     set(CMAKE_CXX_FLAGS "-std=c++11 -pthread -static-libstdc++ -O3")
-    set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined -pthread -std=c++11 -static-libstdc++ -O3")
+    set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined -pthread -static-libstdc++ -O3")
 endif(WIN32)
 
 include_directories(ext)
