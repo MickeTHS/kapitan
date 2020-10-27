@@ -1,12 +1,13 @@
 #include "net_session.h"
+#include "net_packet.h"
+#include "tcp_server.h"
+
 #include <cstdlib>
 #include <stdio.h>
 #include <string>
 #include <stdlib.h>
 #include <time.h>
 
-#include "net_packet.h"
-#include "tcp_server.h"
 
 Net_session::Net_session(uint32_t id, int max_clients, Tcp_server* tcp_server, int udp_port) : _id(id), _max_clients(max_clients), _on_pos(nullptr), _tcp_server(tcp_server) {
     int p = udp_port;
@@ -83,6 +84,14 @@ void Net_session::handle_inc_pos(const std::vector<uint8_t>& data) {
     }
 }
 
+int32_t Net_session::on_tcp_data(const std::vector<uint8_t>& data, uint32_t offset, int32_t len) {
+    // when a packet was unable to be parsed by the
+    // net_slave it will enter here to be processed
+
+    // return the amount of data read
+    return 0;
+}
+
 void Net_session::set_on_pos(std::function<void(const Net_pos&)> func) {
     _on_pos = func;
 }
@@ -95,29 +104,6 @@ bool Net_session::add_client(std::shared_ptr<Net_client> client) {
 
     _clients.push_back(client);
 
-    return true;
-}
-
-bool Net_session::send_config() {
-    Net_group_config config;
-
-    strcpy(config.hostname, "localhost");
-    config.group_id = _id;
-    config.pos_port = _udp_server->get_port();
-    
-
-    std::vector<uint8_t> data;
-    data.resize(sizeof(Net_group_config));
-    config.set_buffer(data, 0);
-
-    for (auto client : _clients) {
-        _tcp_server->sendto_client(client, data);
-    }
-
-    return true;
-}
-
-bool Net_session::send_pos() {
     return true;
 }
 

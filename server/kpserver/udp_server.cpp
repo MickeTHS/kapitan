@@ -152,7 +152,7 @@ bool Udp_server::init() {
     return true;
 }
 
-void Udp_server::set_on_data(std::function<void(const std::vector<uint8_t>&)> func) {
+void Udp_server::set_on_data_callback(std::function<void(const std::vector<uint8_t>&, int32_t)> func) {
 	_on_data = func;
 }
 
@@ -165,7 +165,7 @@ int Udp_server::read() {
 		printf("[POS-UDP][READ][l: %d][p: %d]\n", nbytes, ntohs(_addr.sin_port));
 
 		if (_on_data != nullptr) {
-			_on_data(_recv_buffer);
+			_on_data(_recv_buffer, nbytes);
 		}
 	}
 #else

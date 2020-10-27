@@ -13,11 +13,10 @@ struct Ini_node {
     std::string hostname;
     
     uint32_t id;
-    uint32_t port;
     uint32_t max_users_per_group;
     uint32_t max_groups;
-    uint32_t udp_range_min;
-    uint32_t udp_range_max;
+    uint16_t tcp_port;
+    uint16_t udp_port;
     uint32_t keepalive_time_seconds;
     uint32_t ticks_per_second_internal; // how often we simulate
     uint32_t ticks_per_second_position_update_sends; // how often we send position/player updates

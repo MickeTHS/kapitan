@@ -4,7 +4,10 @@
 #include "net_packet.h"
 #include "process_stats.h"
 
-Net_slave::Net_slave(Tcp_server* tcp, const Ini_file& file, std::shared_ptr<Process_stats> stats) : _tcp(tcp), _ini_file(file), _stats(stats) {
+Net_slave::Net_slave(Tcp_server* tcp, const Ini_file& file, std::shared_ptr<Process_stats> stats) 
+:   _tcp(tcp), 
+    _ini_file(file), 
+    _stats(stats) {
 
     _master.node = _ini_file.get_master();
     _my_node = file.get_me();
@@ -14,8 +17,15 @@ Net_slave::Net_slave(Tcp_server* tcp, const Ini_file& file, std::shared_ptr<Proc
     _master_connection = std::make_shared<Tcp_client>();
     _data_buffer.resize(2000);
 
-    _tcp->set_on_data_callback([&](std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data, int32_t len) {
-        on_inc_client_tcp_data(client, data, len);
+    _udp = std::make_shared<Udp_server>(_my_node->udp_port);
+    _udp->init();
+
+    _udp->set_on_data_callback([&](const std::vector<uint8_t>& data, int32_t data_len){
+        on_inc_client_udp_data(client, data, data_len);
+    });
+
+    _tcp->set_on_data_callback([&](std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data, int32_t data_len) {
+        on_inc_client_tcp_data(client, data, data_len);
     });
 
     _tcp->set_on_client_connect_callback([&](std::shared_ptr<Net_client> client) {
@@ -29,25 +39,32 @@ Net_slave::Net_slave(Tcp_server* tcp, const Ini_file& file, std::shared_ptr<Proc
 
 Net_slave::~Net_slave() {}
 
-void Net_slave::on_inc_client_tcp_data(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data, int32_t len) {
+void Net_slave::on_inc_client_udp_data(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data, int32_t data_len) {
+    // handle incoming UDP data from players
+}
+
+void Net_slave::on_inc_client_tcp_data(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data, int32_t data_len) {
     // incoming TCP data from clients/players
 
     MsgType type = MsgType::None;
     size_t off = 0;
+    size_t len = data_len;
     
     if (client->info.type == NetClientType::Unauthenticated) {
         // we only allow authentication packets
-        MsgType type = (MsgType)((uint8_t)data[0]);
+        MsgType type = (MsgType)((uint8_t)data[off]);
 
         switch (type) {
             case MsgType::NetAuthenticatePlayer:
             {
-                Net_authenticate_player auth(data);
-                off += sizeof(Net_authenticate_player);
+                Net_authenticate_player auth(data, off);
 
                 if (auth.client_password == _my_node->client_password) {
                     printf("[NET-SLAVE][ON-INC-TCP-DATA][NetAuthenticatePlayer][SUCCESS]\n");
                     client->info.type = NetClientType::Player;
+
+                    len -= sizeof(Net_authenticate_player);
+                    off += sizeof(Net_authenticate_player);
                 }
                 else {
                     printf("[NET-SLAVE][ON-INC-TCP-DATA][NetAuthenticatePlayer][FAIL][Invalid password]\n");
@@ -67,7 +84,7 @@ void Net_slave::on_inc_client_tcp_data(std::shared_ptr<Net_client> client, const
         return;
     }
 
-    while (off < len) {
+    while (len > 0) {
         type = (MsgType)((uint8_t)data[off]);
 
         switch (type) {
@@ -77,6 +94,7 @@ void Net_slave::on_inc_client_tcp_data(std::shared_ptr<Net_client> client, const
 
                 Net_player_join_session sess(data, off);
                 off += sizeof(Net_player_join_session);
+                len -= sizeof(Net_player_join_session);
 
                 mmh::Hash_key key(sess.code);
 
@@ -85,6 +103,8 @@ void Net_slave::on_inc_client_tcp_data(std::shared_ptr<Net_client> client, const
                 }
                 else {
                     // session not found
+                    Net_error err(NetErrorType::SessionNotFound);
+                    client->add_tcp_data(&err, sizeof(Net_error));
                 }
                 break;
             }
@@ -94,6 +114,7 @@ void Net_slave::on_inc_client_tcp_data(std::shared_ptr<Net_client> client, const
 
                 Net_player_set_gamerule_int gamerule(data, off);
                 off += sizeof(Net_player_set_gamerule_int);
+                len -= sizeof(Net_player_set_gamerule_int);
 
                 break;
             }
@@ -111,7 +132,7 @@ bool Net_slave::init() {
 void Net_slave::setup_sessions() {
 
     for (int i = 0; i < _my_node->max_groups; ++i) {
-        std::shared_ptr<Net_session> session = std::make_shared<Net_session>(_my_node->id + (1 + i), _my_node->max_users_per_group, _tcp, _my_node->udp_range_min + i);
+        std::shared_ptr<Net_session> session = std::make_shared<Net_session>(_my_node->id + (1 + i), _my_node->max_users_per_group, _tcp, _my_node->udp_port);
         _sessions.push_back(session);
     }
 }
@@ -207,7 +228,7 @@ void Net_slave::print_stats() {
 bool Net_slave::connect_to_master() {
     auto master = _ini_file.get_master();
 
-    if (!_master_connection->init(master->hostname.c_str(), master->port)) {
+    if (!_master_connection->init(master->hostname.c_str(), master->tcp_port)) {
         printf("[NET-SLAVE][INIT][FATAL ERROR][Unable to init connection to master]\n");
         return false;
     }
@@ -216,15 +237,28 @@ bool Net_slave::connect_to_master() {
     // that authenticates with the master
     Net_authenticate_slave reg(_my_node->id, _master.node->master_password);
     reg.set_buffer(_data_buffer, 0);
-
-    for (int i = 0; i < 100; ++i) {
-        if (!_master_connection->send_data(_data_buffer, sizeof(Net_authenticate_slave))) {
-            //printf("[NET-SLAVE][INIT][ERROR][Unable to authenticate with the master]\n");
-            //return false;
-        }
+    
+    if (!_master_connection->send_data(_data_buffer, sizeof(Net_authenticate_slave))) {
+        printf("[NET-SLAVE][INIT][ERROR][Unable to authenticate with the master]\n");
+        return false;
     }
 
     printf("[NET-SLAVE][INIT][Authentication packet sent]\n");
+
+    // send our configuration
+    Net_slave_config config;
+    strcpy(config.hostname, _my_node->hostname.c_str());
+    config.tcp_port = _my_node->tcp_port;
+    config.udp_port = _my_node->udp_port;
+    config.node_id = _my_node->id;
+    
+    config.set_buffer(_data_buffer, sizeof(Net_slave_config));
+
+    if (!_master_connection->send_data(_data_buffer, sizeof(Net_slave_config))) {
+        printf("[NET-SLAVE][INIT][ERROR][Unable to send slave config]\n");
+        return false;
+    }
+
 
     return true;
 }

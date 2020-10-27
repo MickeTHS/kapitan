@@ -22,8 +22,7 @@ struct Net_session {
     virtual ~Net_session();
 
     bool add_client(std::shared_ptr<Net_client> client);
-    bool send_config();
-    bool send_pos();
+    int32_t on_tcp_data(const std::vector<uint8_t>& data, uint32_t offset, int32_t len);
     int read();
     void set_on_pos(std::function<void(const Net_pos&)> func);
     void disconnect(uint16_t entity_id);

@@ -40,7 +40,8 @@ struct Net_client_info {
 	Net_client_info() {
 		ip = "";
 		port = 0;
-		socket = -1;
+		tcp_socket = -1;
+		udp_socket = -1;
 		type = NetClientType::Unauthenticated;
 		session_id = 0;
 		client_id = 0;
@@ -50,7 +51,8 @@ struct Net_client_info {
     int port;
 	uint64_t int_ip;
 
-	SOCKET socket;
+	SOCKET tcp_socket;
+	SOCKET udp_socket;
 	NetClientType type;
 
 
@@ -69,15 +71,18 @@ struct Net_client {
     Net_client(Net_client_info info_, uint32_t id);
 	virtual ~Net_client();
 
-	void handle_rec_packet(uint8_t* data, int msglen);
-	bool init();
-	void read();
+	void add_tcp_data(void* data, uint32_t len);
+	void add_udp_data(void* data, uint32_t len);
+
+	SOCKET get_tcp_socket() const;
+	SOCKET get_udp_socket() const;
+
+	void send_tcp_data();
+	void send_udp_data();
+
 	std::string get_ip() const;
 
     int mseconds_since_activity() const;
-    SOCKET get_socket() const;
-	bool request_buffer_size(uint32_t size) const;
-	void clear_buffer();
 
 	void print() const;
 
@@ -85,15 +90,16 @@ struct Net_client {
 
 	bool log_activity();
 	
-	std::vector<uint8_t> send_buffer;
-	uint32_t buffer_pos;
 	Net_client_info     info;
 
 private:
-	
-	struct	sockaddr_in _addr;
-    struct  ip_mreq     _mreq;
-	int					_addrlen;
+
+	std::vector<uint8_t> _tcp_data_buffer;
+	std::vector<uint8_t> _udp_data_buffer;
+
+	uint32_t _tcp_data_buffer_pos;
+	uint32_t _udp_data_buffer_pos;
+
 	uint32_t			_id;
 	int					_num_flooded_packets;
 

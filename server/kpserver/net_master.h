@@ -47,7 +47,7 @@ struct Net_master {
 private:
     void add_authenticated_slave(std::shared_ptr<Net_client> client, const Net_authenticate_slave& auth);
 
-    void on_inc_tcp_data(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data, int32_t len);
+    void on_inc_tcp_data(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data, int32_t data_len);
     void on_client_connect(std::shared_ptr<Net_client> client);
     void on_client_disconnect(std::shared_ptr<Net_client> client);
 

@@ -8,10 +8,9 @@ Ini_node::Ini_node() {
     id = 0;
     max_users_per_group = 6;
     max_groups = 50;
-    port = 8888;
     is_master = false;
-    udp_range_max = 2900;
-    udp_range_min = 2500;
+    tcp_port = 8888;
+    udp_port = 9000;
     keepalive_time_seconds = 60;
     ticks_per_second_internal = 20;
     ticks_per_second_position_update_sends = 20;
@@ -29,14 +28,13 @@ void Ini_node::print() const {
         printf("[SLAVE]\n");
     }
 
-    printf("name: %s, hostname: %s, id: %d, port: %d, master: %s, udp_range_max: %d, udp_range_min: %d\n", 
+    printf("name: %s, hostname: %s, id: %d, master: %s, tcp_port: %d, udp_port: %d\n", 
         name.c_str(),
         hostname.c_str(),
         id,
-        port,
         is_master ? "Yes" : "No",
-        udp_range_max,
-        udp_range_min
+        tcp_port,
+        udp_port
     );
 }
 
@@ -50,12 +48,11 @@ void Ini_node::write(std::ofstream& outfile) {
 
     outfile << "name:" << name << std::endl;
     outfile << "hostname:" << hostname << std::endl;
-    outfile << "port:" << port << std::endl;
+    outfile << "tcp_port:" << tcp_port << std::endl;
+    outfile << "udp_port:" << udp_port << std::endl;
     outfile << "id:" << id << std::endl;
     outfile << "max_users_per_group:" << max_users_per_group << std::endl;
     outfile << "max_groups:" << max_groups << std::endl;
-    outfile << "udp_range_min:" << udp_range_min << std::endl;
-    outfile << "udp_range_max:" << udp_range_max << std::endl;
     outfile << "keepalive_time_seconds:" << keepalive_time_seconds << std::endl;
     outfile << "ticks_per_second_internal:" << ticks_per_second_internal << std::endl;
     outfile << "ticks_per_second_position_update_sends:" << ticks_per_second_position_update_sends << std::endl;
@@ -168,8 +165,11 @@ bool Ini_file::read() {
         else if (key == "id") {
             current_node->id = stoi(value);
         }
-        else if (key == "port") {
-            current_node->port = stoi(value);
+        else if (key == "tcp_port") {
+            current_node->tcp_port = stoi(value);
+        }
+        else if (key == "udp_port") {
+            current_node->udp_port = stoi(value);
         }
         else if (key == "max_users_per_group") {
             current_node->max_users_per_group = stoi(value);

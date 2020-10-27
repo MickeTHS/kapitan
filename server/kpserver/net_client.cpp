@@ -13,12 +13,15 @@
 
 uint32_t Net_client::__ID_COUNTER = 0;
 
-Net_client::Net_client(Net_client_info info_, uint32_t id) : _num_flooded_packets(0) {
-	info = info_;
-	_id = id;
-
-	send_buffer.resize(BUFFER_SIZE);
-	buffer_pos = 0;
+Net_client::Net_client(Net_client_info info_, uint32_t id) 
+	:	_num_flooded_packets(0),
+		_tcp_data_buffer_pos(0),
+		_udp_data_buffer_pos(0),
+		_id(id),
+		info(info_) {
+	
+	_tcp_data_buffer.resize(BUFFER_SIZE);
+	_udp_data_buffer.resize(BUFFER_SIZE);
 }
 
 /**
@@ -28,10 +31,14 @@ Net_client::~Net_client() {
 	
 #ifdef WIN32
 	//WSACleanup();
-	shutdown(info.socket, SD_BOTH);
-	closesocket(info.socket);
+	shutdown(info.tcp_socket, SD_BOTH);
+	closesocket(info.tcp_socket);
+
+	shutdown(info.udp_socket, SD_BOTH);
+	closesocket(info.udp_socket);
 #else
-	close(_info.socket);
+	close(_info.tcp_socket);
+	close(_info.udp_socket);
 #endif
 }
 
@@ -39,132 +46,63 @@ std::string Net_client::get_ip() const {
 	return info.ip;
 }
 
-bool Net_client::request_buffer_size(uint32_t size) const {
-	if (buffer_pos + size < BUFFER_SIZE) {
-		return true;
+
+void Net_client::add_tcp_data(void* data, uint32_t len) {
+	memcpy(&_tcp_data_buffer[_tcp_data_buffer_pos], data, len);
+
+	_tcp_data_buffer_pos += len;
+}
+
+void Net_client::add_udp_data(void* data, uint32_t len) {
+	memcpy(&_udp_data_buffer[_udp_data_buffer_pos], data, len);
+
+	_udp_data_buffer_pos += len;
+}
+
+void Net_client::send_tcp_data() {
+	
+	int result;
+	uint32_t pos = 0;
+	int32_t len = (int32_t)_tcp_data_buffer_pos;
+
+	while (len > 0) {
+		result = send(info.tcp_socket, (const char*)&_tcp_data_buffer[pos], len, 0);
+		
+		if (result == SOCKET_ERROR) {
+			/*result = WSAGetLastError();
+
+			if (result != WSAEWOULDBLOCK) {
+				// ignore
+			}
+			*/
+			_tcp_data_buffer_pos = 0;
+			return;
+		}
+		else {
+			len -= result;
+			pos += result;
+		}
 	}
 
-	return false;
+	_tcp_data_buffer_pos = 0;
 }
 
-void Net_client::clear_buffer() {
-	buffer_pos = 0;
+void Net_client::send_udp_data() {
+	if (_udp_data_buffer_pos == 0) { return; }
+
+	send(info.udp_socket, (const char*)&_tcp_data_buffer[0], _udp_data_buffer_pos, 0);
+	_udp_data_buffer_pos = 0;
 }
+
 
 uint32_t Net_client::get_id() const {
 	return _id;
 }
 
-bool Net_client::init() {
-	
-	/*int	 nbytes, addrlen;
-	
-    uint8_t yes = 1;
-
-#ifdef WIN32
-	WSADATA wsaData;
-
-	int wsa_result = WSAStartup(MAKEWORD(2, 2), &wsaData);
-	if (wsa_result != 0) {
-		printf("WSAStartup failed with error: %d\n", wsa_result);
-		return 1;
-	}
-#endif
-	// create what looks like an ordinary UDP socket
-	if ((_socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-		perror("socket");
-#ifdef WIN32
-		WSACleanup();
-#endif
-		return false;
-	}
-
-
-#ifdef WIN32
-    // allow multiple sockets to use the same PORT number 
-    if (setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, (const char*)&yes, sizeof(yes)) < 0) {
-        perror("Reusing ADDR failed");
-
-        WSACleanup();
-
-        return false;
-    }
-#else
-    int enable = 1;
-    if (setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
-        perror("setsockopt(SO_REUSEADDR) failed");
-
-        return false;
-    }
-
-#ifdef SO_REUSEPORT
-
-    if (setsockopt(_socket, SOL_SOCKET, SO_REUSEPORT, &enable, sizeof(int)) < 0) {
-        perror("setsockopt(SO_REUSEPORT) failed");
-
-        return false;
-    }
-
-#endif
-
-#endif
-
-	// set up destination address 
-	memset(&_addr, 0, sizeof(_addr));
-	_addr.sin_family = AF_INET;
-	_addr.sin_addr.s_addr = htonl(INADDR_ANY); // N.B.: differs from sender 
-	_addr.sin_port = htons(_info.port);
-
-	// bind to receive address 
-	if (::bind(_socket, (struct sockaddr *) &_addr, sizeof(_addr)) < 0) {
-		perror("bind");
-#ifdef WIN32
-		WSACleanup();
-#endif
-		return false;
-	}
-
-#ifdef WIN32
-	unsigned long mode = 1;
-
-	ioctlsocket(_socket, FIONBIO, &mode);
-#else
-	int status = fcntl(_socket, F_SETFL, fcntl(_socket, F_GETFL, 0) | O_NONBLOCK);
-
-	if (status == -1){
-	    perror("calling fcntl");
-	    // handle the error.  By the way, I've never seen fcntl fail in this way
-	}
-
-#endif
-
-	printf("upd socket started on port %d\n", _port);
-	*/
-	return true;
-}
-
-void Net_client::handle_rec_packet(uint8_t* data, int msglen) {
-	/*int offset = 0;
-	int len = msglen;
-
-	uint8_t* buffer = data;
-
-	while (len > 0) {
-		int type = _msg_conv->convert_msg(&buffer[offset], len, msglen);
-
-		if (type == E_MsgError) {
-            printf("ERROR: Message resulted in error\n");
-            break;
-        }
-
-        _receiver->recv_msg(_msg_conv->_msg_all, type);
-
-		offset += msglen;
-		len -= msglen;
-	}
-	*/
-}
-
+/// <summary>
+/// Checks if the client is sending packets at a good rate
+/// </summary>
+/// <returns>true: good rate, false: packets are flooding</returns>
 bool Net_client::log_activity() {
 	
 	auto now = std::chrono::high_resolution_clock::now();
@@ -175,37 +113,27 @@ bool Net_client::log_activity() {
 		_num_flooded_packets++;
 	}
 
+	_prev_activity = now;
+
 	return _num_flooded_packets < 20;
 }
 
 int Net_client::mseconds_since_activity() const {
-    return 0;
+	auto now = std::chrono::high_resolution_clock::now();
+
+	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - _prev_activity).count();
+
+    return duration;
 }
 
-SOCKET Net_client::get_socket() const {
-	return info.socket;
+SOCKET Net_client::get_tcp_socket() const {
+	return info.tcp_socket;
+}
+
+SOCKET Net_client::get_udp_socket() const {
+	return info.udp_socket;
 }
 
 void Net_client::print() const {
 	info.print();
-}
-
-
-/* call this in infinite loop */
-void Net_client::read() {
-    /*int nbytes;
-
-    _addrlen = sizeof(_addr);
-	
-#ifdef WIN32
-    while ((nbytes = recvfrom(_socket, (char*)&_msg_buf[0], MSG_BUF_SIZE, 0,
-			(struct sockaddr *) &_addr, &_addrlen)) >= 0) {
-		handle_rec_packet(&_msg_buf[0], nbytes);
-    }
-#else
-
-    while ( (nbytes = recvfrom(_socket, (char*)&_msg_buf[0], MSG_BUF_SIZE, 0, (struct sockaddr *) &_addr, (socklen_t*)&_addrlen) ) >= 0 ) {
-        handle_rec_packet(&_msg_buf[0], nbytes);
-    }
-#endif*/
 }

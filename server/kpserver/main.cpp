@@ -84,7 +84,7 @@ int main(int argc , char *argv[])
         return 0;
     }
 
-    Tcp_server tcp(node->port);
+    Tcp_server tcp(node->tcp_port);
 
     std::vector<std::shared_ptr<Net_session>> sessions;
 

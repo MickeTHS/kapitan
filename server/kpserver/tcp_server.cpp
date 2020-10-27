@@ -140,18 +140,6 @@ bool Tcp_server::init() {
     return true;
 }
 
-int Tcp_server::sendto_client(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data) {
-
-    if (send(client->get_socket(), (const char*)&data[0], data.size(), 0) != data.size())
-    {
-        printf("[CON-TCP][SEND][FAIL][h: %s][p: %d][l: %d]\n", client->get_ip().c_str(), _con_port, data.size());
-    }
-    else {
-        printf("[CON-TCP][SEND][OK][h: %s][p: %d][l: %d]\n", client->get_ip().c_str(), _con_port, data.size());
-    }
-
-    return 0;
-}
 
 int Tcp_server::read() {
     // clear our block list every once in a while
@@ -179,7 +167,7 @@ int Tcp_server::read() {
     max_sd = _master_socket;
 
     for (auto client : _clients) {
-        sd = client->get_socket();
+        sd = client->get_tcp_socket();
 
         if (sd > 0) {
             FD_SET(sd, &readfds);
@@ -223,7 +211,7 @@ int Tcp_server::read() {
         Net_client_info info;
 
         connection_info(_address, info);
-        info.socket = new_socket;
+        info.tcp_socket = new_socket;
 
         if (_blocked_clients.find(info.int_ip) != _blocked_clients.end()) {
             printf("Client is blocked\n");
@@ -247,7 +235,7 @@ int Tcp_server::read() {
     for (int i = 0; i < _clients.size(); ++i) {
         auto client = _clients[i];
 
-        sd = client->get_socket();
+        sd = client->get_tcp_socket();
 
         if (FD_ISSET(sd, &readfds)) {
             valread = recv(sd, (char*)&_data_buffer[0], 1024, 0);
@@ -310,6 +298,11 @@ void Tcp_server::disconnect(std::shared_ptr<Net_client> client) {
     }
 }
 
+void Tcp_server::send_client_data() {
+    for (auto client : _clients) {
+        client->send_tcp_data();
+    }
+}
 
 bool Tcp_server::send_data_to_all(const std::vector<uint8_t>& data, size_t len) {
     SOCKET sd;
@@ -318,7 +311,7 @@ bool Tcp_server::send_data_to_all(const std::vector<uint8_t>& data, size_t len) 
     bool success = true;
 
     for (auto client : _clients) {
-        sd = client->get_socket();
+        sd = client->get_tcp_socket();
         if ((bytes_sent = send(sd, (const char*)&data[0], len, 0)) != len) {
             printf("[CON-TCP][SEND_DATA_TO_ALL][ERROR][Unable to send to client socket]\n");
             success = false;

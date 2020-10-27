@@ -6,6 +6,7 @@
 #include <chrono>
 #include <unordered_map>
 
+#include "udp_server.h"
 #include "tcp_client.h"
 #include "net_client.h"
 #include "net_session.h"
@@ -28,7 +29,8 @@ struct Net_slave {
     void update();
     void setup_sessions();
 private:
-    void on_inc_client_tcp_data(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data, int32_t len);
+    void on_inc_client_udp_data(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data, int32_t data_len);
+    void on_inc_client_tcp_data(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data, int32_t data_len);
     void on_client_connect(std::shared_ptr<Net_client> client);
     void on_client_disconnect(std::shared_ptr<Net_client> client);
     void handle_master_command(const Net_master_to_slave_command& command);
@@ -36,6 +38,9 @@ private:
     bool connect_to_master();
 
     Tcp_server*         _tcp;
+    
+    std::shared_ptr<Udp_server> _udp;
+    
     Ini_file            _ini_file;
     Net_master_info     _master;
     std::shared_ptr<Ini_node> _my_node;

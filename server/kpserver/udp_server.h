@@ -38,7 +38,7 @@ struct Udp_server {
     int read();
     int send(const std::vector<uint8_t>& data);
     int get_port() const;
-    void set_on_data(std::function<void(const std::vector<uint8_t>&)> func);
+    void set_on_data_callback(std::function<void(const std::vector<uint8_t>&, int32_t)> func);
 
 private:
     void print_error();
@@ -51,5 +51,5 @@ private:
 
     std::vector<uint8_t> _recv_buffer;
 
-    std::function<void(const std::vector<uint8_t>&)> _on_data;
+    std::function<void(const std::vector<uint8_t>&, int32_t)> _on_data;
 };

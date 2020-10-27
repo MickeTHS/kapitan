@@ -75,8 +75,8 @@ struct Net_authenticate_slave {
         master_password = master_password_;
     }
 
-    Net_authenticate_slave(const std::vector<uint8_t>& data) {
-        memcpy(this, &data[0], sizeof(Net_authenticate_slave));
+    Net_authenticate_slave(const std::vector<uint8_t>& data, uint32_t offset) {
+        memcpy(this, &data[offset], sizeof(Net_authenticate_slave));
     }
 
     void set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
@@ -246,9 +246,9 @@ struct Net_from_slave_keepalive_sessions {
         num_sessions = 0;
     }
 
-    Net_from_slave_keepalive_sessions(const std::vector<uint8_t>& data) {
-        memcpy(&type, &data[0], sizeof(uint8_t));
-        memcpy(&num_sessions, &data[sizeof(uint8_t)], sizeof(uint32_t));
+    Net_from_slave_keepalive_sessions(const std::vector<uint8_t>& data, uint32_t offset) {
+        memcpy(&type, &data[offset], sizeof(uint8_t));
+        memcpy(&num_sessions, &data[offset + sizeof(uint8_t)], sizeof(uint32_t));
 
         if (num_sessions > 10000000) { // if its larger than 1000000 sessions, somethings really odd
             printf("[NET-FROM-SLAVE-KEEPALIVE-SESSIONS][ERROR][Num sessions too large]\n");
@@ -256,7 +256,7 @@ struct Net_from_slave_keepalive_sessions {
         }
 
         session_ids.resize(num_sessions);
-        memcpy(&session_ids[0], &data[sizeof(uint8_t) + sizeof(uint32_t)], sizeof(uint32_t) * num_sessions);
+        memcpy(&session_ids[0], &data[offset + sizeof(uint8_t) + sizeof(uint32_t)], sizeof(uint32_t) * num_sessions);
     }
 };
 
@@ -277,8 +277,8 @@ struct Net_authenticate_player {
         memset(avatar, 0, 32 * sizeof(uint16_t));
     }
 
-    Net_authenticate_player(const std::vector<uint8_t>& data) {
-        memcpy(this, &data[0], sizeof(Net_authenticate_player));
+    Net_authenticate_player(const std::vector<uint8_t>& data, uint32_t offset) {
+        memcpy(this, &data[offset], sizeof(Net_authenticate_player));
     }
 };
 
@@ -290,36 +290,24 @@ struct Net_authenticate_player {
 struct Net_slave_config {
     uint8_t type;
     uint32_t node_id;
-    uint32_t port;
+    uint16_t tcp_port;
+    uint16_t udp_port;
     char hostname[64];
 
-    Net_slave_config(const std::vector<uint8_t>& data) {
-        memcpy(this, &data[0], sizeof(Net_slave_config));
-    }
-
-    Net_slave_config() {
-        type = (uint8_t)MsgType::NetSlaveConfig;
-        port = 0;
-        node_id = 0;
+    Net_slave_config() 
+    :   type((uint8_t)MsgType::NetSlaveConfig), 
+        tcp_port(0),
+        udp_port(0),
+        node_id(0) {
         memset(hostname, 0, 64);
     }
 
-    void from_buffer(const std::vector<uint8_t>& data) {
-        memcpy(&type, &data[0], sizeof(type));
-        memcpy(&node_id, &data[sizeof(type)], sizeof(node_id));
-        memcpy(&port, &data[sizeof(type) + sizeof(node_id)], sizeof(port));
-        memcpy(&hostname[0], &data[sizeof(type) + sizeof(node_id) + sizeof(port)], 64);
-    }
-
-    void set_buffer_fast(std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&data[offset], this, sizeof(Net_slave_config));
+    Net_slave_config(const std::vector<uint8_t>& data, uint32_t offset) {
+        memcpy(this, &data[offset], sizeof(Net_slave_config));
     }
 
     void set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&data[offset], &type, sizeof(type));
-        memcpy(&data[offset + sizeof(type)], &node_id, sizeof(node_id));
-        memcpy(&data[offset + sizeof(type) + sizeof(node_id)], &port, sizeof(port));
-        memcpy(&data[offset + sizeof(type) + sizeof(node_id) + sizeof(port)], &hostname, 64);
+        memcpy(&data[offset], this, sizeof(Net_slave_config));
     }
 };
 

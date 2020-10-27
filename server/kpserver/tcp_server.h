@@ -48,7 +48,8 @@ struct Tcp_server {
 
     bool init();
     int read();
-    int sendto_client(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data);
+    void send_client_data();
+
     void set_on_client_connect_callback(std::function<void(std::shared_ptr<Net_client>)> func);
     void set_on_client_disconnect_callback(std::function<void(std::shared_ptr<Net_client>)> func);
     void set_on_data_callback(std::function<void(std::shared_ptr<Net_client>, const std::vector<uint8_t>& data, int32_t len)> func);

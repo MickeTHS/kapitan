@@ -121,21 +121,28 @@ void Net_master::add_authenticated_slave(std::shared_ptr<Net_client> client, con
     printf("[NET-MASTER][New slave node registered successfully]\n");
 }
 
-void Net_master::on_inc_tcp_data(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data, int32_t len) {
+void Net_master::on_inc_tcp_data(std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data, int32_t data_len) {
     
-    MsgType type = (MsgType)((uint8_t)data[0]);
+    uint32_t pos = 0;
+    int32_t len = data_len;
 
-    if (client->info.type == NetClientType::Unauthenticated) {
-        // we only allow authentication packets
+    while (data_len > 0) {
+        MsgType type = (MsgType)((uint8_t)data[pos]);
 
-        switch (type) {
+        if (client->info.type == NetClientType::Unauthenticated) {
+            // we only allow authentication packets
+
+            switch (type) {
             case MsgType::NetAuthenticatePlayer:
             {
-                Net_authenticate_player auth(data);
+                Net_authenticate_player auth(data, pos);
 
                 if (auth.client_password == _my_node->client_password) {
                     printf("[NET-MASTER][ON-INC-TCP-DATA][NetAuthenticatePlayer][SUCCESS]\n");
                     client->info.type = NetClientType::Player;
+
+                    pos += sizeof(Net_authenticate_player);
+                    len -= sizeof(Net_authenticate_player);
                 }
                 else {
                     printf("[NET-MASTER][ON-INC-TCP-DATA][NetAuthenticatePlayer][FAIL][Invalid password]\n");
@@ -146,78 +153,93 @@ void Net_master::on_inc_tcp_data(std::shared_ptr<Net_client> client, const std::
             }
             case MsgType::NetAuthenticateSlave:
             {
-                Net_authenticate_slave auth(data);
+                Net_authenticate_slave auth(data, pos);
 
                 if (auth.master_password == _my_node->master_password) {
                     printf("[NET-MASTER][ON-INC-TCP-DATA][NetAuthenticateSlave][SUCCESS]\n");
-                    
+
                     add_authenticated_slave(client, auth);
                 }
                 else {
                     printf("[NET-MASTER][ON-INC-TCP-DATA][NetAuthenticateSlave][FAIL][Invalid master password]\n");
                     _tcp->disconnect(client);
+                    return;
                 }
 
-                return;
+                pos += sizeof(Net_authenticate_slave);
+                len -= sizeof(Net_authenticate_slave);
             }
             default:
                 // disconnect
                 break;
+            }
+
+            printf("[NET-MASTER][ON-INC-TCP-DATA][ERROR][Client tried to send message without authenticated state]\n");
+            _tcp->disconnect(client);
+
+            return;
         }
 
-        printf("[NET-MASTER][ON-INC-TCP-DATA][ERROR][Client tried to send message without authenticated state]\n");
-        _tcp->disconnect(client);
+        switch (type) {
+            case MsgType::NetPlayerRequestSlaveNode: {
+                printf("[NET-MASTER][NetPlayerRequestSlaveNode]\n");
 
-        return;
-    }
+                pos += sizeof(Net_player_request_slave_node);
+                len -= sizeof(Net_player_request_slave_node);
 
-    switch (type) {
-        case MsgType::NetPlayerRequestSlaveNode: {
-            printf("[NET-MASTER][NetPlayerRequestSlaveNode]\n");
+                // no need to populate packet, its only a uint8
+                // just send a slave config
+                // But first we need to check that the player has been registered on the master node
+                break;
+            }
+            case MsgType::NetFromSlaveToMasterKeepaliveSession: {
+                // Keepalive messages are sent from the slave node to the master to indicate that everything is fine with the session
+                printf("[NET-MASTER][NetFromSlaveToMasterKeepaliveSession]\n");
 
-            // no need to populate packet, its only a uint8
-            // just send a slave config
-            // But first we need to check that the player has been registered on the master node
-            break;
-        }
-        case MsgType::NetFromSlaveToMasterKeepaliveSession: {
-            // Keepalive messages are sent from the slave node to the master to indicate that everything is fine with the session
-            printf("[NET-MASTER][NetFromSlaveToMasterKeepaliveSession]\n");
+                Net_from_slave_keepalive_sessions keep(data, pos);
 
-            Net_from_slave_keepalive_sessions keep(data);
+                for (auto id : keep.session_ids) {
+                    if (_session_id_lookup.find(id) == _session_id_lookup.end()) {
+                        printf("[NET-MASTER][ERROR][NetFromSlaveToMasterKeepaliveSession][Session not found]\n");
+                        continue;
+                    }
 
-            for (auto id : keep.session_ids) {
-                if (_session_id_lookup.find(id) == _session_id_lookup.end()) {
-                    printf("[NET-MASTER][ERROR][NetFromSlaveToMasterKeepaliveSession][Session not found]\n");
-                    continue;
+                    _session_id_lookup[id]->keepalive();
                 }
 
-                _session_id_lookup[id]->keepalive();
+                pos += sizeof(Net_from_slave_keepalive_sessions);
+                len -= sizeof(Net_from_slave_keepalive_sessions);
+                break;
             }
-            break;
-        }
-        case MsgType::NetSlaveHealthReport:
-        {
-            printf("[NET-MASTER][NetSlaveHealthReport][Got health report from slave]\n");
-            auto slave = get_slave(client);
+            case MsgType::NetSlaveHealthReport:
+            {
+                printf("[NET-MASTER][NetSlaveHealthReport][Got health report from slave]\n");
+                auto slave = get_slave(client);
 
-            if (slave == nullptr) {
-                printf("[NET-MASTER][NetSlaveHealthReport][ERROR][Cant find slave with client_id: %d]\n", client->info.client_id);
-                return;
+                if (slave == nullptr) {
+                    printf("[NET-MASTER][NetSlaveHealthReport][ERROR][Cant find slave with client_id: %d]\n", client->info.client_id);
+                    return;
+                }
+
+                Net_slave_health_snapshot health(data, pos);
+                printf("Health report from slave_id: %d\n", slave->slave_id);
+                slave->set_health_rating(health);
+                std::sort(_slaves_health.begin(), _slaves_health.end(), best_health_is_first());
+
+                health.print();
+
+                pos += sizeof(Net_slave_health_snapshot);
+                len -= sizeof(Net_slave_health_snapshot);
+
+                break;
             }
+            default:
+                printf("[NET-MASTER][ON_INC_DATA][ERROR][Unknown message type: %d]\n", type);
 
-            Net_slave_health_snapshot health(data, 0);
-            printf("Health report from slave_id: %d\n", slave->slave_id);
-            slave->set_health_rating(health);
-            std::sort(_slaves_health.begin(), _slaves_health.end(), best_health_is_first());
-
-            health.print();
-
-            break;
+                pos = 0;
+                len = 0;
+                break;
         }
-        default:
-            printf("[NET-MASTER][ON_INC_DATA][ERROR][Unknown message type: %d]\n", type);
-            break;
     }
 }
 
