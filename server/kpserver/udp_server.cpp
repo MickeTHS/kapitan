@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string>
 #include <stdio.h>
+#include <string.h>
 
 #ifdef WIN32
 
@@ -30,6 +31,7 @@
 
 #endif
 
+
 #include "net_packet.h"
 
 Udp_server::Udp_server(int port)
@@ -54,7 +56,7 @@ Udp_server::~Udp_server() {
 	shutdown(_socket, SD_SEND);
 	closesocket(_socket);
 #else
-	close(_info.socket);
+	close(_socket);
 #endif
 }
 
