@@ -34,6 +34,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <netdb.h>
 
 #endif
 
