@@ -243,11 +243,13 @@ int Tcp_server::read() {
             switch (valread) {
                 case -1:
                 case 0:
+#ifdef WIN32
                 case WSAENOTCONN:
                 case WSAENOTSOCK:
                 case WSAESHUTDOWN:
                 case WSAECONNABORTED:
                 case WSAECONNRESET:
+#endif
                     printf("disconnected\n");
                     disconnect(client);
                     --i;
