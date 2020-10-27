@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string>
 #include <stdio.h>
+#include <string.h>
 
 #ifndef WIN32
 #include <sys/socket.h>
@@ -41,8 +42,8 @@ Net_client::~Net_client() {
 	shutdown(info.udp_socket, SD_BOTH);
 	closesocket(info.udp_socket);
 #else
-	close(_info.tcp_socket);
-	close(_info.udp_socket);
+	close(info.tcp_socket);
+	close(info.udp_socket);
 #endif
 }
 
