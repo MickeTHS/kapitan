@@ -173,7 +173,9 @@ int Udp_server::read() {
 	}
 #else
 	while ((nbytes = recvfrom(_socket, (char*)&_recv_buffer[0], _recv_buffer.size(), 0, (struct sockaddr *) &_addr, (socklen_t*)&_addrlen) ) >= 0 ) {
-		handle_rec_packet(&_msg_buf[0], nbytes);
+		if (_on_data != nullptr) {
+			_on_data(_recv_buffer, nbytes);
+		}
 	}
 #endif
 
