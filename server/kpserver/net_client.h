@@ -17,6 +17,12 @@
 #include <windows.h>
 #include <Ws2tcpip.h>
 #else
+
+#ifndef SOCKET
+#define SOCKET int32_t
+#endif
+
+
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -25,6 +31,7 @@
 #include <sys/types.h>
 #include <time.h>
 #include <stdio.h>
+
 #endif
 
 enum class NetClientType {
