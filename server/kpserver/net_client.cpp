@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <cstdlib>
+#include <limits.h>
 
 #ifndef WIN32
 #include <sys/socket.h>
