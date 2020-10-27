@@ -132,6 +132,7 @@ int Tcp_client::read_data(std::vector<uint8_t>& buffer) {
 
     if ((valread = recv(_socket, (char*)&buffer[0], 1024, 0)) <= 0)
     {
+#ifdef WIN32
         switch (valread) {
             case 0:
                 printf("[TCP-CLIENT][READ][DISCONNECT GRACEFULLY]\n");
@@ -193,6 +194,13 @@ int Tcp_client::read_data(std::vector<uint8_t>& buffer) {
                 print_error();
                 break;
         }
+#else
+        switch (valread) {
+            case -1:
+            case 0:
+                disconnect();
+        }
+#endif
     }
     else 
     {
