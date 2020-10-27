@@ -25,6 +25,10 @@
 #include <time.h>
 #include <stdio.h>
 
+#ifndef SOCKET
+#define SOCKET int32_t
+#endif
+
 #endif
 
 
