@@ -186,11 +186,25 @@ struct Process_stats {
 #else 
 
 struct Process_stats {
+    std::deque<int64_t> tick_idle_timings;
+    bool is_overloaded;
+    uint64_t num_good_ticks;
+    uint64_t num_lag_ticks;
+    
     Process_stats() {}
 
     // https://stackoverflow.com/questions/63166/how-to-determine-cpu-and-memory-consumption-from-inside-a-process
     bool gather_stats(Process_stats_snapshot& snapshot) {
+        return false;        
+    }
+
+    void add_tick_idle_timing(int64_t amount_of_idle_time) {
         
+    }
+
+    int64_t calc_average_idle_time() {
+        
+        return 0;
     }
 
     void init_process_cpu_query() {
