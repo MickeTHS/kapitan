@@ -67,7 +67,7 @@ private:
     std::unordered_map<uint32_t, std::shared_ptr<Net_slave_info>> _slave_by_client_id; // client_id is key
     std::vector<std::shared_ptr<Net_slave_info>> _slaves_health;
 
-    std::chrono::steady_clock::time_point _next_slave_report;
+    std::chrono::time_point<std::chrono::high_resolution_clock> _next_slave_report;
 
     std::vector<uint8_t> _data_buffer;
 };

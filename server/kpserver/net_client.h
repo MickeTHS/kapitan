@@ -110,6 +110,6 @@ private:
 
 	uint32_t			_id;
 	int					_num_flooded_packets;
-
-	std::chrono::steady_clock::time_point _prev_activity;
+	
+	std::chrono::time_point<std::chrono::high_resolution_clock> _prev_activity;
 };

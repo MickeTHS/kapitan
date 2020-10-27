@@ -51,7 +51,7 @@ private:
 
     std::vector<uint8_t> _data_buffer;
 
-    std::chrono::steady_clock::time_point _next_slave_report;
+    std::chrono::time_point<std::chrono::high_resolution_clock> _next_slave_report;
 
 
     std::unordered_map<uint32_t, std::shared_ptr<Net_session>>        _session_code_lookup; // this is a hash as a key

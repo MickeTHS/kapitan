@@ -26,8 +26,8 @@ Net_session::Net_session(uint32_t id, int max_clients, Tcp_server* tcp_server, i
         printf("[NET-SESSION][FAIL][id: %d][POS-UDP: %d]\n", _id, p);
     }
     
-    _udp_server->set_on_data([&](const std::vector<uint8_t>& data) {
-        on_udp_data(data);
+    _udp_server->set_on_data_callback([&](const std::vector<uint8_t>& data, int32_t data_len) {
+        on_udp_data(data, data_len);
     });
 }
 
@@ -61,7 +61,7 @@ void Net_session::generate_session_code() {
     session_code_hash = mmh::Hash_key(session_code);
 }
 
-void Net_session::on_udp_data(const std::vector<uint8_t>& data) {
+void Net_session::on_udp_data(const std::vector<uint8_t>& data, int32_t data_len) {
     MsgType type = (MsgType)data[0];
 
     switch(type) {

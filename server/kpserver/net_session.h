@@ -34,7 +34,7 @@ struct Net_session {
     mmh::Hash_key session_code_hash;
 private:
     void handle_inc_pos(const std::vector<uint8_t>& data);
-    void on_udp_data(const std::vector<uint8_t>& data);
+    void on_udp_data(const std::vector<uint8_t>& data, int32_t data_len);
 
     std::vector<std::shared_ptr<Net_client>> _clients;
     uint32_t _id;

@@ -21,7 +21,7 @@ Net_slave::Net_slave(Tcp_server* tcp, const Ini_file& file, std::shared_ptr<Proc
     _udp->init();
 
     _udp->set_on_data_callback([&](const std::vector<uint8_t>& data, int32_t data_len){
-        on_inc_client_udp_data(client, data, data_len);
+        on_inc_client_udp_data(nullptr, data, data_len);
     });
 
     _tcp->set_on_data_callback([&](std::shared_ptr<Net_client> client, const std::vector<uint8_t>& data, int32_t data_len) {
