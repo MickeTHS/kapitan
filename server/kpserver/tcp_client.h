@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <stdint.h>
+#include <stdio.h>
 
 #ifdef WIN32
 
