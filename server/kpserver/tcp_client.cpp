@@ -1,8 +1,23 @@
 #include "tcp_client.h"
+#include "trace.h"
 
-Tcp_client::Tcp_client() : _socket(0), _initialized(false) {}
+Tcp_client::Tcp_client() 
+    :   _socket(0), 
+        _initialized(false),
+        _on_data(nullptr) {
+
+    _data_buffer_pos = 0;
+    _data_buffer.resize(10000);
+}
+
+Tcp_client::~Tcp_client() {
+#ifdef WIN32
+    WSACleanup();
+#endif
+}
 
 bool Tcp_client::init(const char* ip, const char* hostname, bool is_ip_set, int port) {
+    
     _socket = 0;
 
     struct sockaddr_in serv_addr; 
@@ -13,7 +28,7 @@ bool Tcp_client::init(const char* ip, const char* hostname, bool is_ip_set, int 
     int wsa_result = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (wsa_result != 0) {
 
-        printf("[TCP-CLIENT][INIT][FAIL][WSASTARTUP]:\n");
+        TRACE("[TCP-CLIENT][INIT][FAIL][WSASTARTUP]:\n");
         
         return false;
     }
@@ -25,21 +40,21 @@ bool Tcp_client::init(const char* ip, const char* hostname, bool is_ip_set, int 
 
     if ((_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
-        printf("[TCP-CLIENT][INIT][ERROR][Unable to create socket]\n");
+        TRACE("[TCP-CLIENT][INIT][ERROR][Unable to create socket]\n");
         return false;
     }
 
     if (is_ip_set) {
         if (inet_pton(AF_INET, ip, &serv_addr.sin_addr) <= 0)
         {
-            printf("[TCP-CLIENT][INIT][ERROR][Unable to format IP address]\n");
+            TRACE("[TCP-CLIENT][INIT][ERROR][Unable to format IP address]\n");
             return false;
         }
     }
     else {
         // resolve hostname
         if ((he = gethostbyname(hostname)) == NULL) {
-            printf("[TCP-CLIENT][INIT][ERROR][Hostname lookup failed]\n");
+            TRACE("[TCP-CLIENT][INIT][ERROR][Hostname lookup failed]\n");
             return false;
         }
 
@@ -52,14 +67,12 @@ bool Tcp_client::init(const char* ip, const char* hostname, bool is_ip_set, int 
 #endif
     }
 
-    printf("[TCP-CLIENT][INIT][Ip of remote server: %s]\n", ip);
+    TRACE("[TCP-CLIENT][INIT][Ip of remote server: %s]\n", ip);
    
     if (connect(_socket, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
     { 
-        printf("[TCP-CLIENT][INIT][ERROR][Connection error]\n");
+        TRACE("[TCP-CLIENT][INIT][ERROR][Connection error]\n");
         print_error();
-        
-        //WSACleanup();
 
         return false; 
     } 
@@ -92,26 +105,66 @@ void Tcp_client::print_error() {
         NULL, WSAGetLastError(),
         MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
         (LPWSTR)&s, 0, NULL);
-    fprintf(stderr, "%S\n", s);
+    TRACE("%S\n", s);
     LocalFree(s);
 #endif
+}
+
+void Tcp_client::add_data(void* data, int32_t len) {
+    memcpy(&_data_buffer[_data_buffer_pos], data, len);
+    _data_buffer_pos += len;
+}
+
+void Tcp_client::send_buffer() {
+    size_t bytes_sent;
+
+    uint32_t pos = 0;
+    int32_t len = (int32_t)_data_buffer_pos;
+
+    while (len > 0) {
+        bytes_sent = send(_socket, (const char*)&_data_buffer[pos], len, 0);
+
+        if (bytes_sent == SOCKET_ERROR) {
+            /*result = WSAGetLastError();
+
+            if (result != WSAEWOULDBLOCK) {
+                // ignore
+            }
+            */
+            _data_buffer_pos = 0;
+            return;
+        }
+        else {
+            len -= bytes_sent;
+            pos += bytes_sent;
+        }
+    }
+
+    _data_buffer_pos = 0;
 }
 
 bool Tcp_client::send_data(const std::vector<uint8_t>& buffer, int len) {
     size_t bytes_sent;
     
     if ((bytes_sent = send(_socket, (const char*)&buffer[0], len, 0)) != len) {
-        printf("[TCP-CLIENT][SEND_DATA][ERROR][Unable to send data]\n");
+        TRACE("[TCP-CLIENT][SEND_DATA][ERROR][Unable to send data]\n");
         print_error();
         return false;
     }
 
-    printf("OK\n");
-
     return true;
 }
 
-int Tcp_client::read_data(std::vector<uint8_t>& buffer) {
+void Tcp_client::set_on_data_callback(std::function<void(const std::vector<uint8_t>& data, int32_t len)> func) {
+    _on_data = func;
+}
+
+void Tcp_client::update() {
+    read_data(_data_buffer);
+    send_buffer();
+}
+
+int32_t Tcp_client::read_data(std::vector<uint8_t>& buffer) {
 
     if (!_initialized) {
         return 0;
@@ -139,62 +192,62 @@ int Tcp_client::read_data(std::vector<uint8_t>& buffer) {
 #ifdef WIN32
         switch (valread) {
             case 0:
-                printf("[TCP-CLIENT][READ][DISCONNECT GRACEFULLY]\n");
+                TRACE("[TCP-CLIENT][READ][DISCONNECT GRACEFULLY]\n");
                 closesocket(_socket);
                 break;
             case WSAEWOULDBLOCK:
-                printf("[TCP-CLIENT][READ][ERROR][WSAEWOULDBLOCK]\n");
+                TRACE("[TCP-CLIENT][READ][ERROR][WSAEWOULDBLOCK]\n");
                 // would block, so no data
                 break;
             case WSANOTINITIALISED:
-                printf("[TCP-CLIENT][READ][ERROR][WSANOTINITIALISED]\n");
+                TRACE("[TCP-CLIENT][READ][ERROR][WSANOTINITIALISED]\n");
                 break;
             case WSAENETDOWN:
-                printf("[TCP-CLIENT][READ][ERROR][WSAENETDOWN]\n");
+                TRACE("[TCP-CLIENT][READ][ERROR][WSAENETDOWN]\n");
                 break;
             case WSAEFAULT:
-                printf("[TCP-CLIENT][READ][ERROR][WSAEFAULT]\n");
+                TRACE("[TCP-CLIENT][READ][ERROR][WSAEFAULT]\n");
                 break;
             case WSAENOTCONN:
-                printf("[TCP-CLIENT][READ][ERROR][WSAENOTCONN]\n");
+                TRACE("[TCP-CLIENT][READ][ERROR][WSAENOTCONN]\n");
                 break;
             case WSAEINTR:
-                printf("[TCP-CLIENT][READ][ERROR][WSAEINTR]\n");
+                TRACE("[TCP-CLIENT][READ][ERROR][WSAEINTR]\n");
                 break;
             case WSAEINPROGRESS:
-                printf("[TCP-CLIENT][READ][ERROR][WSAEINPROGRESS]\n");
+                TRACE("[TCP-CLIENT][READ][ERROR][WSAEINPROGRESS]\n");
                 break;
             case WSAENETRESET:
-                printf("[TCP-CLIENT][READ][ERROR][WSAENETRESET]\n");
+                TRACE("[TCP-CLIENT][READ][ERROR][WSAENETRESET]\n");
                 break;
             case WSAENOTSOCK:
-                printf("[TCP-CLIENT][READ][ERROR][WSAENOTSOCK]\n");
+                TRACE("[TCP-CLIENT][READ][ERROR][WSAENOTSOCK]\n");
                 break;
             case WSAEOPNOTSUPP:
-                printf("[TCP-CLIENT][READ][ERROR][WSAEOPNOTSUPP]\n");
+                TRACE("[TCP-CLIENT][READ][ERROR][WSAEOPNOTSUPP]\n");
                 break;
             case WSAESHUTDOWN:
-                printf("[TCP-CLIENT][READ][ERROR][WSAESHUTDOWN]\n");
+                TRACE("[TCP-CLIENT][READ][ERROR][WSAESHUTDOWN]\n");
                 break;
             case WSAEMSGSIZE:
-                printf("[TCP-CLIENT][READ][ERROR][WSAEMSGSIZE]\n");
+                TRACE("[TCP-CLIENT][READ][ERROR][WSAEMSGSIZE]\n");
                 break;
             case WSAEINVAL:
-                printf("[TCP-CLIENT][READ][ERROR][WSAEINVAL]\n");
+                TRACE("[TCP-CLIENT][READ][ERROR][WSAEINVAL]\n");
                 break;
             case WSAECONNABORTED:
-                printf("[TCP-CLIENT][READ][ERROR][WSAECONNABORTED]\n");
+                TRACE("[TCP-CLIENT][READ][ERROR][WSAECONNABORTED]\n");
                 break;
             case WSAETIMEDOUT:
-                printf("[TCP-CLIENT][READ][ERROR][WSAETIMEDOUT]\n");
+                TRACE("[TCP-CLIENT][READ][ERROR][WSAETIMEDOUT]\n");
                 break;
             case WSAECONNRESET:
-                printf("[TCP-CLIENT][READ][ERROR][WSAECONNRESET]\n");
+                TRACE("[TCP-CLIENT][READ][ERROR][WSAECONNRESET]\n");
                 break;
             default:
                 // fault on the master, try to reconnect
                 disconnect();
-                printf("[TCP-CLIENT][READ][ERROR][%d]\n", valread);
+                TRACE("[TCP-CLIENT][READ][ERROR][%d]\n", valread);
                 print_error();
                 break;
         }
@@ -209,6 +262,10 @@ int Tcp_client::read_data(std::vector<uint8_t>& buffer) {
     else 
     {
         // got data
+        if (_on_data != nullptr) {
+            _on_data(buffer, valread);
+        }
+
         return valread;
     }
 

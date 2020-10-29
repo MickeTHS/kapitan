@@ -11,11 +11,13 @@
 #include <time.h>
 
 
-Net_session::Net_session(uint32_t id, int max_players, Tcp_server* tcp_server, Udp_server* udp_server)
+Net_session::Net_session(uint32_t id, uint8_t max_players, uint32_t keepalive_seconds, Tcp_server* tcp_server, Udp_server* udp_server)
     :   _id(id), 
         _max_players(max_players), 
         _tcp_server(tcp_server),
-        _udp_server(udp_server) {
+        _udp_server(udp_server),
+        _owner(NULL),
+        _keepalive_seconds(keepalive_seconds) {
     
     _players.resize(max_players);
     
@@ -65,8 +67,49 @@ void Net_session::generate_session_code() {
     session_code_hash = mmh::Hash_key(session_code);
 }
 
-void Net_session::broadcast(const std::vector<uint8_t>& data, uint32_t len) {
-    
+bool Net_session::is_empty() const {
+    return _players.empty();
+}
+
+bool Net_session::is_old(std::chrono::time_point<std::chrono::high_resolution_clock>& now) const {
+    auto duration = std::chrono::duration_cast<std::chrono::seconds>(now - _last_keepalive).count();
+
+    if (duration > _keepalive_seconds) {
+        return true;
+    }
+
+    return false;
+}
+
+void Net_session::set_num_players(uint8_t num_players) {
+    _num_players = num_players;
+}
+
+uint8_t Net_session::get_num_players() const {
+    return _num_players;
+}
+
+void Net_session::broadcast_udp(void* data, uint32_t len) {
+    for (auto& player : _players) {
+        player.client_connection->add_udp_data(data, len);
+    }
+}
+
+void Net_session::broadcast_tcp(void* data, uint32_t len) {
+    for (auto& player : _players) {
+        player.client_connection->add_tcp_data(data, len);
+    }
+}
+
+
+Net_client* Net_session::find_client(Net_client* client) const {
+    for (auto& player : _players) {
+        if (player.client_connection == client) {
+            return player.client_connection;
+        }
+    }
+
+    return NULL;
 }
 
 void Net_session::on_udp_data(const std::vector<uint8_t>& data, int32_t data_len) {
@@ -98,14 +141,27 @@ void Net_session::set_on_pos(std::function<void(const Net_pos&)> func) {
     _on_pos = func;
 }
 
-bool Net_session::add_player(Net_client* client) {
+uint32_t Net_session::get_id() const {
+    return _id;
+}
+
+bool Net_session::add_player_and_broadcast(Net_client* client, bool broadcast, bool is_owner) {
     if (_num_players == _max_players) {
         return false; // its full
     }
 
     _players[_num_players].assign(_num_players, client->info.client_id, client);
-    _num_players++;
+    
+    if (is_owner) {
+        _owner = client;
+    }
 
+    if (broadcast) {
+        Net_player_join_session_response resp(_num_players, _id, client->info.username);
+        _num_players++;
+        broadcast_tcp(&resp, sizeof(Net_player_join_session_response));
+    }
+    
     return true;
 }
 

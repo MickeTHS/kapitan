@@ -60,25 +60,27 @@ struct Net_client_info {
 		udp_port = 0;
 		udp_established = false;
 		quick_hash = 0;
+		memset(username, 0, 64);
 	}
 
-    std::string ip;
-    int port;
-	uint32_t int_ip;
+    std::string			ip;
+    int					port;
+	uint32_t			int_ip;
 
-	SOCKET tcp_socket;
-	SOCKET udp_socket;
-	NetClientType type;
+	SOCKET				tcp_socket;
+	SOCKET				udp_socket;
+	NetClientType		type;
 
 	struct	sockaddr_in udp_addr;
 	socklen_t           udp_addr_len;
 	bool				udp_established;
 
-	uint64_t quick_hash;
-	uint32_t session_id;
-	uint32_t client_id;
-	uint16_t udp_code;
-	uint16_t udp_port;
+	uint64_t			quick_hash;
+	uint32_t			session_id;
+	uint32_t			client_id;
+	uint16_t			udp_code;
+	uint16_t			udp_port;
+	char				username[64];
 
 	void print() const {
 		printf("[NET-CLIENT][fd: %d][p: %d][ip: %s]\n", socket, port, ip.c_str());
@@ -116,14 +118,14 @@ struct Net_client {
 
 private:
 
-	std::vector<uint8_t> _tcp_data_buffer;
-	std::vector<uint8_t> _udp_data_buffer;
+	std::vector<uint8_t>	_tcp_data_buffer;
+	std::vector<uint8_t>	_udp_data_buffer;
 
-	uint32_t _tcp_data_buffer_pos;
-	uint32_t _udp_data_buffer_pos;
+	uint32_t				_tcp_data_buffer_pos;
+	uint32_t				_udp_data_buffer_pos;
 
-	uint32_t			_id;
-	int					_num_flooded_packets;
+	uint32_t				_id;
+	int						_num_flooded_packets;
 	
 	std::chrono::time_point<std::chrono::high_resolution_clock> _prev_activity;
 };

@@ -14,8 +14,8 @@ struct Ini_node {
     std::string ip;
     
     uint32_t id;
-    uint32_t max_users_per_group;
-    uint32_t max_groups;
+    uint32_t max_users_per_session;
+    uint32_t max_sessions;
     uint16_t tcp_port;
     uint16_t udp_port;
     uint32_t keepalive_time_seconds;
@@ -24,6 +24,7 @@ struct Ini_node {
     uint32_t slave_sync_interval_seconds;
     uint64_t master_password;
     uint64_t client_password;
+    uint32_t session_id_start_range;
 
     bool is_me;
     bool is_master;
@@ -39,13 +40,13 @@ struct Ini_node {
 struct Ini_file {
     Ini_file() {}
 
-    std::vector<std::shared_ptr<Ini_node>> nodes;
+    std::vector<std::unique_ptr<Ini_node>> nodes;
 
     Ini_file(const std::string& filename);
 
-    std::shared_ptr<Ini_node> get_master() const;
-    std::shared_ptr<Ini_node> get_me() const;
-    void get_slaves(std::vector<std::shared_ptr<Ini_node>>& slaves) const;
+    Ini_node* get_master() const;
+    Ini_node* get_me() const;
+    void get_slaves(std::vector<Ini_node*>& slaves) const;
 
     void print_help();
     bool save();

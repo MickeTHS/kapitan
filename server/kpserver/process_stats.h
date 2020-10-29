@@ -21,16 +21,26 @@
 
 struct Process_stats_snapshot {
     uint64_t ram_virt_total_bytes;
+
     uint64_t ram_virt_used_bytes;
+
     uint64_t ram_virt_process_used_bytes;
+
     uint64_t ram_phys_total_bytes;
+
     uint64_t ram_phys_used_bytes;
+
     uint64_t ram_phys_process_used_bytes;
+
     int64_t avg_tick_idle_time; // negative means we are lagging
+
     uint64_t num_good_ticks;
+
     uint64_t num_lag_ticks;
 
+
     double cpu_load_total;
+
     double cpu_load_process;
 };
 

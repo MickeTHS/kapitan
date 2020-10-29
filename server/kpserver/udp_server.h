@@ -54,7 +54,7 @@ struct Udp_server {
     virtual ~Udp_server();
 
     bool init(int port);
-    int read();
+    
     int send(const std::vector<Net_client*>& clients, const std::vector<uint8_t>& data, uint32_t len);
     int session_send(const std::vector<Net_session_player*>& players, int num_players, const std::vector<uint8_t>& data, uint32_t data_len);
     int get_port() const;
@@ -62,6 +62,8 @@ struct Udp_server {
     void set_on_client_connect_callback(std::function<void(Net_client*, const Net_Udp_establish&)> func);
     void establish_client_connection(Net_client* client);
     void remove_client(Net_client* client);
+
+    int read();
 
 private:
     void print_error();

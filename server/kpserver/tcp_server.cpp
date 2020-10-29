@@ -20,9 +20,9 @@ void connection_info(struct sockaddr_in& client, Net_client_info& info)
 }
 
 
-Tcp_server::Tcp_server(int con_port) 
+Tcp_server::Tcp_server() 
     :   _max_clients(10000),
-        _con_port(con_port),
+        _port(0),
         _clear_tick_counter(0),
         _master_socket(0),
         _addrlen(0),
@@ -30,10 +30,6 @@ Tcp_server::Tcp_server(int con_port)
         _on_disconnect(nullptr),
         _address({ 0 })
 {
-    _address.sin_family = AF_INET;
-    _address.sin_addr.s_addr = INADDR_ANY;
-    _address.sin_port = htons(_con_port);
-
     _data_buffer.resize(2000);
 }
 
@@ -67,8 +63,12 @@ void Tcp_server::print_error() {
 #endif
 }
 
-bool Tcp_server::init() {
+bool Tcp_server::init(uint16_t port) {
     printf("[CON-TCP][INIT]\n");
+    _port = port;
+    _address.sin_family = AF_INET;
+    _address.sin_addr.s_addr = INADDR_ANY;
+    _address.sin_port = htons(_port);
 
     int new_socket, i;
 
@@ -139,7 +139,7 @@ bool Tcp_server::init() {
 #endif 
 
     _addrlen = sizeof(_address);
-    printf("[CON-TCP][INIT][OK][p: %d]\n", _con_port);
+    printf("[CON-TCP][INIT][OK][p: %d]\n", _port);
 
     return true;
 }

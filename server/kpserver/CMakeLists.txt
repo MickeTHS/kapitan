@@ -53,6 +53,8 @@ set(KPSERVER_SRC_FILES
     process_stats.h
     tcp_client.cpp
     tcp_client.h
+    trace.cpp
+    trace.h
 )
 
 if(WIN32)

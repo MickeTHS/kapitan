@@ -37,7 +37,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>    //strlen
+#include <string.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <vector>
@@ -53,11 +53,14 @@
 #define CON_SOCKET_DESCR 0
 #define CHAT_SOCKET_DESCR 1
 
+/// <summary>
+/// A Tcp server used by both the slaves and the master
+/// </summary>
 struct Tcp_server {
-    Tcp_server(int con_port);
+    Tcp_server();
     virtual ~Tcp_server();
 
-    bool init();
+    bool init(uint16_t port);
     int read();
     void send_client_data();
 
@@ -73,7 +76,7 @@ struct Tcp_server {
 private:
     void print_error();
 
-    int _con_port;
+    uint16_t _port;
     
     SOCKET _master_socket;
     

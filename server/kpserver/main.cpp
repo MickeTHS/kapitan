@@ -30,11 +30,8 @@
 #include <thread>
 #include <string>
 #include <memory>
-
 #include <chrono>
 
-#include "tcp_server.h"
-#include "udp_server.h"
 #include "net_session.h"
 #include "world_instance.h"
 #include "ini_file.h"
@@ -42,16 +39,6 @@
 #include "net_slave.h"
 #include "process_stats.h"
 
-
-void print_byte_buffer(uint8_t *buffer, int length) {
-	std::string debugOut;
-
-	for (int i = 0; i < length; ++i) {
-		debugOut += " " + std::to_string((uint8_t)buffer[i]);
-	}
-
-	printf("%s\n", debugOut.c_str());
-}
 
 int main(int argc , char *argv[])
 {
@@ -84,30 +71,11 @@ int main(int argc , char *argv[])
         return 0;
     }
 
-    Tcp_server tcp(node->tcp_port);
+    std::unique_ptr<Net_master> master_node = nullptr;
+    std::unique_ptr<Net_slave> slave_node = nullptr;
 
-    std::shared_ptr<Net_master> master_node = nullptr;
-    std::shared_ptr<Net_slave> slave_node = nullptr;
+    std::unique_ptr<Process_stats> stats = std::make_unique<Process_stats>();
 
-    std::shared_ptr<Process_stats> stats = std::make_shared<Process_stats>();
-
-    if (node->is_master) {
-        printf("[MAIN][MASTER][STARTUP]\n");
-
-        // master nodes doesnt start groups
-
-        master_node = std::make_shared<Net_master>(&tcp, ini);
-    }
-    else {
-        printf("[MAIN][SLAVE][STARTUP]\n");
-
-        slave_node = std::make_shared<Net_slave>(&tcp, ini, stats);
-        slave_node->setup_sessions();
-
-    }
-    
-    tcp.init();
-    
     bool run = true;
 
     auto start_update = std::chrono::high_resolution_clock::now();
@@ -117,22 +85,29 @@ int main(int argc , char *argv[])
     uint64_t duration = 0;
     int64_t idle_time = 0;
 
-    uint64_t test = 0;
+    if (node->is_master) {
+        printf("[MAIN][MASTER][STARTUP]\n");
 
-    if (master_node != nullptr) {
-        //if (master_node->init)
+        master_node = std::make_unique<Net_master>(&ini);
     }
-    else if (slave_node != nullptr) {
+    else {
+        printf("[MAIN][SLAVE][STARTUP]\n");
+
+        // When the slave node is created, it will also create a udp socket
+        slave_node = std::make_unique<Net_slave>(&ini, stats.get());
+        slave_node->setup_sessions();
+
+        // Initiate the slave node
+        // This will connect to the master node
+        // Also sends the slave node configuration to the master node
         if (!slave_node->init()) {
             printf("[SLAVE][MAIN][ERROR][Unable to initialize Net-Slave]\n");
             return 0;
         }
     }
-
+    
     while (run) {
         start_update = std::chrono::high_resolution_clock::now();
-
-        tcp.read();
 
         if (slave_node != nullptr) {
             slave_node->update();
@@ -141,10 +116,6 @@ int main(int argc , char *argv[])
             master_node->update();
         }
 
-        for (uint64_t i = 0; i < 1000000; ++i) {
-            test = ((test * 44) * test) / 10000;
-        }
-        
         auto now = std::chrono::high_resolution_clock::now();
         duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_update).count();
         idle_time = milliseconds_tickcount - duration;

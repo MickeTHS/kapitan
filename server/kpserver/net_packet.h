@@ -15,19 +15,23 @@ enum class MsgType {
     GroupConfig = 0,
     NetPlayerPos = 1,
     NetOtherPos = 2,
-    NetPlayerRequestSlaveNode,
+    NetPlayerSlaveNodeRequest,
+    NetPlayerSlaveNodeResponse,
     NetSlaveConfig,
     NetSlaveSessionSummary,
-    NetPlayer,
-    NetPlayerRequestSlaveConfig,
     NetSnapshotPlayer,
     NetAuthenticatePlayer,
     NetAuthenticateSlave,
-    NetFromSlaveToMasterKeepaliveSession,
+    NetFromSlaveSyncSession,
     NetFromMasterToSlaveCommand,
-    NetPlayerJoinSession,
+    NetPlayerHostSessionRequest,
+    NetPlayerHostSessionResponseOk,
+    NetPlayerHostSessionResponseReject,
+    NetPlayerJoinSessionRequest,
+    NetPlayerJoinSessionResponse,
     NetPlayerJoinNotify,
     NetPlayerLeaveSession,
+    NetPlayerSession,
     NetError,
     NetSlaveHealthReport,
     NetPlayerSetGameRuleInt,
@@ -39,6 +43,10 @@ enum class MsgType {
 enum class NetErrorType {
     None = 0,
     SessionNotFound,
+    NoAvailableSessions,
+    Banned,
+    AlreadyHaveSession,
+    SessionIsFull
 };
 
 
@@ -73,12 +81,12 @@ struct Net_Udp_establish {
     
     }
 
-    Net_Udp_establish(const std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(this, &data[offset], sizeof(Net_Udp_establish));
+    Net_Udp_establish(const std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(this, &data[off], sizeof(Net_Udp_establish));
     }
 
-    void set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&data[offset], this, sizeof(Net_Udp_establish));
+    void set_buffer(std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(&data[off], this, sizeof(Net_Udp_establish));
     }
 };
 
@@ -97,12 +105,12 @@ struct Net_Udp_client_connection_info {
         memset(ip, 0, 64);
     }
 
-    Net_Udp_client_connection_info(const std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(this, &data[offset], sizeof(Net_Udp_client_connection_info));
+    Net_Udp_client_connection_info(const std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(this, &data[off], sizeof(Net_Udp_client_connection_info));
     }
 
-    void set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&data[offset], this, sizeof(Net_Udp_client_connection_info));
+    void set_buffer(std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(&data[off], this, sizeof(Net_Udp_client_connection_info));
     }
 };
 
@@ -125,12 +133,12 @@ struct Net_authenticate_slave {
         master_password = master_password_;
     }
 
-    Net_authenticate_slave(const std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(this, &data[offset], sizeof(Net_authenticate_slave));
+    Net_authenticate_slave(const std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(this, &data[off], sizeof(Net_authenticate_slave));
     }
 
-    void set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&data[offset], this, sizeof(Net_authenticate_slave));
+    void set_buffer(std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(&data[off], this, sizeof(Net_authenticate_slave));
     }
 };
 
@@ -149,6 +157,29 @@ struct Net_player_leave_session {
     }
 };
 
+struct Net_session_player_packet {
+    uint8_t     type;
+    uint32_t    player_id;
+    char        username[64];
+    uint16_t    avatar[32];
+
+    Net_session_player_packet() : type((uint8_t)MsgType::NetPlayerSession), player_id(0) {
+        
+    }
+
+    Net_session_player_packet(const std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(this, &data[off], sizeof(Net_session_player_packet));
+    }
+
+    void set_buffer(std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(&data[off], this, sizeof(Net_session_player_packet));
+    }
+
+    void from_buffer(const std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(this, &data[off], sizeof(Net_session_player_packet));
+    }
+};
+
 /// <summary>
 /// Notification sent to other players that a player has joined the session
 /// </summary>
@@ -163,29 +194,96 @@ struct Net_player_join_notify {
         memset(avatar, 0, 32 * sizeof(uint16_t));
     }
 
-    Net_player_join_notify(const std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(this, &data[offset], sizeof(Net_player_join_notify));
+    Net_player_join_notify(const std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(this, &data[off], sizeof(Net_player_join_notify));
     }
 
-    void set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&data[offset], &type, sizeof(Net_player_join_notify));
+    void set_buffer(std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(&data[off], &type, sizeof(Net_player_join_notify));
+    }
+};
+
+
+/// <summary>
+/// When a player wants to host a game
+/// </summary>
+struct Net_player_host_session_request {
+    uint8_t type;
+    
+    Net_player_host_session_request() {
+        type = (uint8_t)MsgType::NetPlayerHostSessionRequest;
+    }
+
+    Net_player_host_session_request(const std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(this, &data[off], sizeof(Net_player_host_session_request));
+    }
+
+    void set_buffer(std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(&data[off], this, sizeof(Net_player_host_session_request));
+    }
+};
+
+
+/// <summary>
+/// The response sent back to the client regarding the request to to host a session
+/// </summary>
+struct Net_player_host_session_response_ok {
+    uint8_t     type;
+    char        code[16];
+    uint32_t    session_id;
+    uint8_t     max_players;
+
+    Net_player_host_session_response_ok() {
+        type = (uint8_t)MsgType::NetPlayerHostSessionResponseOk;
+    }
+
+    Net_player_host_session_response_ok(const std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(this, &data[off], sizeof(Net_player_host_session_response_ok));
+    }
+
+    void set_buffer(std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(&data[off], this, sizeof(Net_player_host_session_response_ok));
     }
 };
 
 /// <summary>
 /// When a player wants to join a session
 /// </summary>
-struct Net_player_join_session {
+struct Net_player_join_session_request {
     uint8_t type;
     char code[16];
 
-    Net_player_join_session() {
-        type = (uint8_t)MsgType::NetPlayerJoinSession;
+    Net_player_join_session_request() {
+        type = (uint8_t)MsgType::NetPlayerJoinSessionRequest;
         memset(code, 0, 16);
     }
 
-    Net_player_join_session(const std::vector<uint8_t>& data, uint32_t off) {
-        memcpy(this, &data[off], sizeof(Net_player_join_session));
+    Net_player_join_session_request(const std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(this, &data[off], sizeof(Net_player_join_session_request));
+    }
+};
+
+/// <summary>
+/// Send this when a player has joined a session
+/// Also send it to all players inside the session
+/// </summary>
+struct Net_player_join_session_response {
+    uint8_t type;
+    uint8_t player_short_id;
+    uint32_t session_id;
+    char username[64];
+    uint16_t avatar[32];
+
+    Net_player_join_session_response(uint8_t player_short_id_, uint32_t session_id_, const char* username_) {
+        type = (uint8_t)MsgType::NetPlayerJoinSessionResponse;
+        player_short_id = player_short_id_;
+        session_id = session_id_;
+        strcpy(username, username_);
+        memset(avatar, 0, 32 * sizeof(uint16_t));
+    }
+
+    Net_player_join_session_response(const std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(this, &data[off], sizeof(Net_player_join_session_response));
     }
 };
 
@@ -193,13 +291,28 @@ struct Net_player_join_session {
 /// Sent to a master node to get a "good" slave node
 /// Should send back a Net_slave_config to the player
 /// </summary>
-struct Net_player_request_slave_node {
+struct Net_player_slave_node_request {
     uint8_t type;
 
-    Net_player_request_slave_node() {
-        type = (uint8_t)MsgType::NetPlayerRequestSlaveNode;
+    Net_player_slave_node_request() {
+        type = (uint8_t)MsgType::NetPlayerSlaveNodeRequest;
     }
 
+};
+
+struct Net_player_slave_node_response {
+    uint8_t type;
+    uint32_t slave_id;
+    uint16_t tcp_port;
+    char ip[64];
+
+    Net_player_slave_node_response() {
+        type = (uint8_t)MsgType::NetPlayerSlaveNodeResponse;
+    }
+
+    void set_buffer(std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(&data[off], this, sizeof(Net_player_slave_node_response));
+    }
 };
 
 /// <summary>
@@ -220,13 +333,13 @@ struct Net_master_to_slave_command {
         command = (uint8_t)cmd;
     }
 
-    Net_master_to_slave_command(const std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(this, &data[offset], sizeof(Net_master_to_slave_command));
+    Net_master_to_slave_command(const std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(this, &data[off], sizeof(Net_master_to_slave_command));
     }
 
-    void set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&data[offset], &type, sizeof(uint8_t));
-        memcpy(&data[offset + sizeof(uint8_t)], &command, sizeof(uint8_t));
+    void set_buffer(std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(&data[off], &type, sizeof(uint8_t));
+        memcpy(&data[off + sizeof(uint8_t)], &command, sizeof(uint8_t));
     }
 };
 
@@ -242,22 +355,24 @@ struct Net_slave_health_snapshot {
     uint16_t pct_good_vs_lag_ticks;
     int64_t avg_tick_idle_time;
     uint16_t pct_cpu_load_process;
+    uint16_t num_connected_players;
 
-    Net_slave_health_snapshot(float virt_process_ram_used, float good_vs_lag_ticks, int64_t avg_idle_time, float cpu_load) {
+    Net_slave_health_snapshot(float virt_process_ram_used, float good_vs_lag_ticks, int64_t avg_idle_time, float cpu_load, uint16_t num_players) {
         type = (uint8_t)MsgType::NetSlaveHealthReport;
         pct_virt_process_ram_used = (uint16_t)(virt_process_ram_used * 10000.0f);
         pct_good_vs_lag_ticks = (uint16_t)(good_vs_lag_ticks * 10000.0f);
         pct_cpu_load_process = (uint16_t)(cpu_load * 10000.0f);
 
         avg_tick_idle_time = avg_idle_time;
+        num_connected_players = num_players;
     }
 
-    Net_slave_health_snapshot(const std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(this, &data[offset], sizeof(Net_slave_health_snapshot));
+    Net_slave_health_snapshot(const std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(this, &data[off], sizeof(Net_slave_health_snapshot));
     }
 
-    void set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&data[offset], this, sizeof(Net_slave_health_snapshot));
+    void set_buffer(std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(&data[off], this, sizeof(Net_slave_health_snapshot));
     }
 
     void print() {
@@ -266,6 +381,7 @@ struct Net_slave_health_snapshot {
         printf("Pct LAG ticks: %f\n", ((float)pct_good_vs_lag_ticks / 10000.0f));
         printf("Avg Idle time: %ld\n", avg_tick_idle_time);
         printf("Pct CPU Load: %f\n", 0.0f);
+        printf("Num players: %d\n", num_connected_players);
     }
 };
 
@@ -283,30 +399,27 @@ struct Net_from_slave_report_health {
 };
 
 /// <summary>
-/// A signal that instructs the master node to keep the session alive in memory
-/// When the host has disconnected this message will stop
+/// Syncs the state of the session with the master
 /// </summary>
-struct Net_from_slave_keepalive_sessions {
+struct Net_from_slave_sync_session {
     uint8_t type;
-    uint32_t num_sessions;
-    std::vector<uint32_t> session_ids;
+    uint32_t session_id;
+    uint8_t num_players;
+    char code[8];
 
-    Net_from_slave_keepalive_sessions() {
-        type = (uint8_t)MsgType::NetFromSlaveToMasterKeepaliveSession;
-        num_sessions = 0;
+    Net_from_slave_sync_session() {
+        type = (uint8_t)MsgType::NetFromSlaveSyncSession;
+        session_id = 0;
+        num_players = 0;
+        memset(code, 0, 8);
     }
 
-    Net_from_slave_keepalive_sessions(const std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&type, &data[offset], sizeof(uint8_t));
-        memcpy(&num_sessions, &data[offset + sizeof(uint8_t)], sizeof(uint32_t));
+    Net_from_slave_sync_session(const std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(this, &data[off], sizeof(Net_from_slave_sync_session));
+    }
 
-        if (num_sessions > 10000000) { // if its larger than 1000000 sessions, somethings really odd
-            printf("[NET-FROM-SLAVE-KEEPALIVE-SESSIONS][ERROR][Num sessions too large]\n");
-            return;
-        }
-
-        session_ids.resize(num_sessions);
-        memcpy(&session_ids[0], &data[offset + sizeof(uint8_t) + sizeof(uint32_t)], sizeof(uint32_t) * num_sessions);
+    void set_buffer(std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(&data[off], this, sizeof(Net_from_slave_sync_session));
     }
 };
 
@@ -327,8 +440,8 @@ struct Net_authenticate_player {
         memset(avatar, 0, 32 * sizeof(uint16_t));
     }
 
-    Net_authenticate_player(const std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(this, &data[offset], sizeof(Net_authenticate_player));
+    Net_authenticate_player(const std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(this, &data[off], sizeof(Net_authenticate_player));
     }
 };
 
@@ -352,12 +465,12 @@ struct Net_slave_config {
         memset(hostname, 0, 64);
     }
 
-    Net_slave_config(const std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(this, &data[offset], sizeof(Net_slave_config));
+    Net_slave_config(const std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(this, &data[off], sizeof(Net_slave_config));
     }
 
-    void set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&data[offset], this, sizeof(Net_slave_config));
+    void set_buffer(std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(&data[off], this, sizeof(Net_slave_config));
     }
 };
 
@@ -368,54 +481,7 @@ struct Net_slave_config {
 
 /// ---------- Lobby/connection packets --------------- //
 
-struct Net_player_request_slave_config {
-    uint8_t type;
 
-    Net_player_request_slave_config() {
-        type = (uint8_t)MsgType::NetPlayerRequestSlaveConfig;
-    }
-};
-
-/// <summary>
-/// Not sure when we need this....
-/// </summary>
-struct Net_player {
-    uint8_t type;
-    uint16_t entity_id;
-    char username[64];
-    uint16_t avatar[32];
-
-    Net_player(const std::vector<uint8_t>& data) {
-        memcpy(this, &data[0], sizeof(Net_player));
-    }
-
-    Net_player() {
-        type = (uint8_t)MsgType::NetPlayer;
-        entity_id = 0;
-        memset(avatar, 0, sizeof(uint16_t) * 32);
-        memset(username, 0, 64);
-    }
-
-    void from_buffer(const std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&type, &data[offset], sizeof(type));
-        memcpy(&entity_id, &data[offset + sizeof(type)], sizeof(entity_id));
-        memcpy(&username[0], &data[offset + sizeof(type) + sizeof(entity_id)], 64);
-        memcpy(&avatar[0], &data[offset + sizeof(type) + sizeof(entity_id) + 64], 32 * sizeof(uint16_t));
-    }
-
-    bool set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&data[offset], &type, sizeof(type));
-        memcpy(&data[offset + sizeof(type)], &entity_id, sizeof(entity_id));
-        memcpy(&data[offset + sizeof(type) + sizeof(entity_id)], username, 64);
-        memcpy(&data[(uint64_t)offset + sizeof(type) + sizeof(entity_id) + 64], avatar, sizeof(uint16_t) * 32);
-
-        return true;
-    }
-
-    void set_buffer_fast(std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&data[offset], this, sizeof(Net_player));
-    }
-};
 
 /// <summary>
 /// When the player marked as owner
@@ -430,12 +496,12 @@ struct Net_player_set_gamerule_int {
           rule_id(0),
           rule_value(0) { }
 
-    Net_player_set_gamerule_int(const std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(this, &data[offset], sizeof(Net_player_set_gamerule_int));
+    Net_player_set_gamerule_int(const std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(this, &data[off], sizeof(Net_player_set_gamerule_int));
     }
 
-    void set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&data[offset], &type, sizeof(Net_player_set_gamerule_int));
+    void set_buffer(std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(&data[off], &type, sizeof(Net_player_set_gamerule_int));
     }
 };
 
@@ -447,34 +513,25 @@ struct Net_slave_session_players_list {
     uint8_t type;
     uint8_t num_players;
 
-    std::vector<Net_player> players;
+    std::vector<Net_session_player_packet> players;
 
-    void from_buffer(const std::vector<uint8_t>& data, uint32_t offset) {
+    void from_buffer(const std::vector<uint8_t>& data, uint32_t off) {
         memcpy(&type, &data[0], sizeof(type));
         memcpy(&num_players, &data[sizeof(type)], sizeof(num_players));
 
         players.resize(num_players);
 
         for (int i = 0; i < num_players; ++i) {
-            players[i].from_buffer(data, sizeof(type) + sizeof(num_players) + sizeof(Net_player) * i);
+            players[i].from_buffer(data, sizeof(type) + sizeof(num_players) + sizeof(Net_session_player_packet) * i);
         }
     }
 
-    void set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&data[offset], &type, sizeof(type));
-        memcpy(&data[offset + sizeof(type)], &num_players, sizeof(num_players));
+    void set_buffer(std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(&data[off], &type, sizeof(type));
+        memcpy(&data[off + sizeof(type)], &num_players, sizeof(num_players));
 
         for (int i = 0; i < num_players; ++i) {
-            players[i].set_buffer(data, offset + sizeof(type) + sizeof(num_players) + sizeof(Net_player) * i);
-        }
-    }
-
-    void set_buffer_fast(std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&data[offset], this, sizeof(uint8_t) + sizeof(uint8_t));
-
-        for (int i = 0; i < num_players; ++i) {
-            //memcpy(&data[offset + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(Net_player) * i], &players[i], sizeof(Net_player));
-            players[i].set_buffer_fast(data, offset + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(Net_player) * i);
+            players[i].set_buffer(data, off + sizeof(type) + sizeof(num_players) + sizeof(Net_session_player_packet) * i);
         }
     }
 };
@@ -489,18 +546,18 @@ struct Net_slave_session_summary {
     uint8_t max_players;
     uint8_t num_players;
 
-    void from_buffer(const std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&type, &data[offset], sizeof(type));
-        memcpy(&session_id, &data[offset + sizeof(type)], sizeof(session_id));
-        memcpy(&max_players, &data[offset + sizeof(type) + sizeof(session_id)], sizeof(max_players));
-        memcpy(&num_players, &data[offset + sizeof(type) + sizeof(session_id) + sizeof(max_players)], sizeof(num_players));
+    void from_buffer(const std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(&type, &data[off], sizeof(type));
+        memcpy(&session_id, &data[off + sizeof(type)], sizeof(session_id));
+        memcpy(&max_players, &data[off + sizeof(type) + sizeof(session_id)], sizeof(max_players));
+        memcpy(&num_players, &data[off + sizeof(type) + sizeof(session_id) + sizeof(max_players)], sizeof(num_players));
     }
 
-    void set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&data[offset], &type, sizeof(type));
-        memcpy(&data[offset + sizeof(type)], &session_id, sizeof(session_id));
-        memcpy(&data[offset + sizeof(type) + sizeof(session_id)], &max_players, sizeof(max_players));
-        memcpy(&data[offset + sizeof(type) + sizeof(session_id) + sizeof(max_players)], &num_players, sizeof(num_players));
+    void set_buffer(std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(&data[off], &type, sizeof(type));
+        memcpy(&data[off + sizeof(type)], &session_id, sizeof(session_id));
+        memcpy(&data[off + sizeof(type) + sizeof(session_id)], &max_players, sizeof(max_players));
+        memcpy(&data[off + sizeof(type) + sizeof(session_id) + sizeof(max_players)], &num_players, sizeof(num_players));
     }
 };
 
@@ -524,11 +581,11 @@ struct Net_group_config {
         memset(hostname, 0, 64);
     }
 
-    void set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&data[offset], &type, 1);
-        memcpy(&data[offset + sizeof(uint8_t)], &group_id, sizeof(group_id));
-        memcpy(&data[offset + sizeof(uint8_t) + sizeof(group_id)], &pos_port, sizeof(pos_port));
-        memcpy(&data[offset + sizeof(uint8_t) + sizeof(group_id) + sizeof(pos_port)], hostname, 64);
+    void set_buffer(std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(&data[off], &type, 1);
+        memcpy(&data[off + sizeof(uint8_t)], &group_id, sizeof(group_id));
+        memcpy(&data[off + sizeof(uint8_t) + sizeof(group_id)], &pos_port, sizeof(pos_port));
+        memcpy(&data[off + sizeof(uint8_t) + sizeof(group_id) + sizeof(pos_port)], hostname, 64);
     }
 };
 
@@ -555,12 +612,12 @@ struct Net_snapshot_player {
         flags = 0;
     }
 
-    Net_snapshot_player(const std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(this, &data[offset], sizeof(Net_snapshot_player));
+    Net_snapshot_player(const std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(this, &data[off], sizeof(Net_snapshot_player));
     }
 
-    void set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&data[offset], this, sizeof(Net_snapshot_player));
+    void set_buffer(std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(&data[off], this, sizeof(Net_snapshot_player));
     }
 };
 
@@ -591,12 +648,12 @@ struct Net_pos {
         player_short_id = 0;
     }
 
-    Net_pos(const std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(this, &data[offset], sizeof(Net_pos));
+    Net_pos(const std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(this, &data[off], sizeof(Net_pos));
     }
 
-    void set_buffer(std::vector<uint8_t>& data, uint32_t offset) {
-        memcpy(&data[offset], this, sizeof(Net_pos));
+    void set_buffer(std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(&data[off], this, sizeof(Net_pos));
     }
 
     void print() {

@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <functional>
 
 #ifdef WIN32
 
@@ -37,18 +38,42 @@
 
 #endif
 
-
+/// <summary>
+/// A simple non blocking TCP client, currently only used by
+/// node slaves to connect to the master node
+/// </summary>
 struct Tcp_client {
     Tcp_client();
+    virtual ~Tcp_client();
 
     bool init(const char* ip, const char* hostname, bool is_ip_set, int port);
-    int read_data(std::vector<uint8_t>& buffer);
+
+    void add_data(void* data, int32_t len);
+
+    void send_buffer();
+
     bool send_data(const std::vector<uint8_t>& buffer, int len);
+
     void disconnect();
+
     bool is_initialized() const;
+
+    void set_on_data_callback(std::function<void(const std::vector<uint8_t>& data, int32_t len)> func);
+
+    void update();
+
 private:
     void print_error();
 
+    int32_t read_data(std::vector<uint8_t>& buffer);
+
     SOCKET _socket;
+
     bool _initialized;
+   
+    std::vector<uint8_t> _data_buffer;
+
+    uint32_t _data_buffer_pos;
+
+    std::function<void(const std::vector<uint8_t>& data, int32_t len)> _on_data;
 };

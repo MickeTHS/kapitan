@@ -14,8 +14,10 @@ struct Transform_entity {
     glm::quat rot;
 
     Transform_entity(uint16_t id);
+    
     virtual ~Transform_entity();
 
     void set_inc_pos(const Net_pos& pos);
+
     void set_out_pos(Net_pos& netpos);
 };

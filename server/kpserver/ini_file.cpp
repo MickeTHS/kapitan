@@ -7,8 +7,8 @@ Ini_node::Ini_node() {
     ip = "";
     name = "test";
     id = 0;
-    max_users_per_group = 6;
-    max_groups = 50;
+    max_users_per_session = 6;
+    max_sessions = 50;
     is_master = false;
     tcp_port = 8888;
     udp_port = 9000;
@@ -20,6 +20,7 @@ Ini_node::Ini_node() {
     client_password = 0;
     is_me = false;
     is_ip_set = false;
+    session_id_start_range = 1000;
 }
 
 void Ini_node::print() const {
@@ -54,8 +55,8 @@ void Ini_node::write(std::ofstream& outfile) {
     outfile << "tcp_port:" << tcp_port << std::endl;
     outfile << "udp_port:" << udp_port << std::endl;
     outfile << "id:" << id << std::endl;
-    outfile << "max_users_per_group:" << max_users_per_group << std::endl;
-    outfile << "max_groups:" << max_groups << std::endl;
+    outfile << "max_users_per_session:" << max_users_per_session << std::endl;
+    outfile << "max_sessions:" << max_sessions << std::endl;
     outfile << "keepalive_time_seconds:" << keepalive_time_seconds << std::endl;
     outfile << "ticks_per_second_internal:" << ticks_per_second_internal << std::endl;
     outfile << "ticks_per_second_position_update_sends:" << ticks_per_second_position_update_sends << std::endl;
@@ -63,6 +64,7 @@ void Ini_node::write(std::ofstream& outfile) {
     outfile << "master_password:" << master_password << std::endl;
     outfile << "is_me:" << (is_me ? "yes" : "no") << std::endl;
     outfile << "client_password:" << client_password << std::endl;
+    outfile << "session_id_start_range:" << session_id_start_range << std::endl;
     outfile << "" << std::endl;
 }
 
@@ -70,32 +72,34 @@ Ini_file::Ini_file (const std::string& filename) {
     _filepath = filename;
 }
 
-std::shared_ptr<Ini_node> Ini_file::get_master() const {
-    for (auto node : nodes) {
-        if (node->is_master) {
-            return node;
+Ini_node* Ini_file::get_master() const {
+    
+    for (int i = 0; i < nodes.size(); ++i) {
+        if (nodes[i]->is_master) {
+            return nodes[i].get();
         }
     }
 
-    return nullptr;
+    return NULL;
 }
 
-std::shared_ptr<Ini_node> Ini_file::get_me() const {
-    for (auto node : nodes) {
-        if (node->is_me) {
-            return node;
+Ini_node* Ini_file::get_me() const {
+
+    for (int i = 0; i < nodes.size(); ++i) {
+        if (nodes[i]->is_me) {
+            return nodes[i].get();
         }
     }
 
-    return nullptr;
+    return NULL;
 }
 
-void Ini_file::get_slaves(std::vector<std::shared_ptr<Ini_node>>& slaves) const {
+void Ini_file::get_slaves(std::vector<Ini_node*>& slaves) const {
     auto me = get_me();
 
-    for (auto node : nodes) {
-        if (node != me) {
-            slaves.push_back(node);
+    for (int i = 0; i < nodes.size(); ++i) {
+        if (nodes[i].get() != me) {
+            slaves.push_back(nodes[i].get());
         }
     }
 }
@@ -108,9 +112,8 @@ bool Ini_file::save() {
     std::ofstream outfile;
     outfile.open(_filepath);
 
-
-    for (auto n : nodes) {
-        n->write(outfile);
+    for (int i = 0; i < nodes.size(); ++i) {
+        nodes[i]->write(outfile);
     }
 
     outfile.close();
@@ -129,7 +132,7 @@ bool Ini_file::read() {
 
     std::vector<std::string> keys;
 
-    std::shared_ptr<Ini_node> current_node = nullptr;
+    Ini_node* current_node = NULL;
 
     while(getline(infile, line)) {
         if (line.length() <= 0 || line[0] == '#')
@@ -137,16 +140,23 @@ bool Ini_file::read() {
         
         if (line.find("[MASTER]") != std::string::npos) {
             keys.clear();
-            current_node = std::make_shared<Ini_node>();
-            nodes.push_back(current_node);
+            
+            auto cn = std::make_unique<Ini_node>();
+            
+            current_node = cn.get();
+            
+            nodes.push_back(std::move(cn));
             
             current_node->is_master = true;
         }
         else if (line.find("[SLAVE]") != std::string::npos) {
             keys.clear();
-            current_node = std::make_shared<Ini_node>();
             
-            nodes.push_back(current_node);
+            auto cn = std::make_unique<Ini_node>();
+            
+            current_node = cn.get();
+
+            nodes.push_back(std::move(cn));
 
             current_node->is_master = false;
         }
@@ -178,14 +188,17 @@ bool Ini_file::read() {
         else if (key == "udp_port") {
             current_node->udp_port = stoi(value);
         }
-        else if (key == "max_users_per_group") {
-            current_node->max_users_per_group = stoi(value);
+        else if (key == "max_users_per_session") {
+            current_node->max_users_per_session = stoi(value);
         }
-        else if (key == "max_groups") {
-            current_node->max_groups = stoi(value);
+        else if (key == "max_sessions") {
+            current_node->max_sessions = stoi(value);
         }
         else if (key == "keepalive_time_seconds") {
             current_node->keepalive_time_seconds = stoi(value);
+        }
+        else if (key == "session_id_start_range") {
+            current_node->session_id_start_range = stoi(value);
         }
         else if (key == "master_password") {
             current_node->master_password = std::stoull(value, nullptr, 10);
@@ -207,9 +220,6 @@ bool Ini_file::read() {
         }
     }
 
-    for (auto n : nodes) {
-        n->print();
-    }
 
     return true;
 }
