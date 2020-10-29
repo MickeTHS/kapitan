@@ -17,6 +17,8 @@ struct Net_session_player {
     void assign(uint8_t net_player_short_id_, uint32_t client_id_, Net_client* info);
 
     bool is_valid_for_play() const;
+
+    void reset();
     
     uint8_t net_player_short_id;
     uint16_t entity_session_id;

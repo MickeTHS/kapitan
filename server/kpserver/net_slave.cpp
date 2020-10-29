@@ -159,8 +159,8 @@ void Net_slave::on_inc_client_tcp_data(Net_client* client, const std::vector<uin
     // incoming TCP data from clients/players
 
     MsgType type = MsgType::None;
-    size_t off = 0;
-    size_t len = data_len;
+    uint32_t off = 0;
+    int32_t len = data_len;
     
     if (client->info.type == NetClientType::Unauthenticated) {
         // we only allow authentication packets
@@ -226,6 +226,8 @@ void Net_slave::on_inc_client_tcp_data(Net_client* client, const std::vector<uin
                     continue;
                 }
 
+                // generate a new session code
+                session->generate_session_code();
                 session->add_player_and_broadcast(client, false, true);
 
                 Net_player_host_session_response_ok resp;
@@ -234,6 +236,9 @@ void Net_slave::on_inc_client_tcp_data(Net_client* client, const std::vector<uin
                 resp.max_players = _my_node->max_users_per_session;
                 
                 client->add_tcp_data(&resp, sizeof(Net_player_host_session_response_ok));
+
+                // lastly, notify the master that we have a user in the session
+                sync_session_with_master(session);
 
                 break;
             }
@@ -258,12 +263,38 @@ void Net_slave::on_inc_client_tcp_data(Net_client* client, const std::vector<uin
                     }
 
                     session->add_player_and_broadcast(client, true, false);
+
+                    sync_session_with_master(session);
                 }
                 else {
                     // session not found
                     Net_error err(NetErrorType::SessionNotFound);
                     client->add_tcp_data(&err, sizeof(Net_error));
                 }
+                break;
+            }
+            case MsgType::NetPlayerLeaveSessionRequest:
+            {
+                Net_player_leave_session_request req(data, off);
+                off += sizeof(Net_player_leave_session_request);
+                len -= sizeof(Net_player_leave_session_request);
+
+                if (_session_id_lookup.find(req.session_id) == _session_id_lookup.end()) {
+                    Net_error err(NetErrorType::SessionNotFound);
+                    client->add_tcp_data(&err, sizeof(Net_error));
+                    
+                    break;
+                }
+
+                Net_session* session = _session_id_lookup[req.session_id];
+                session->remove_player(client);
+                
+                client->reset_session();
+
+                Net_success success(NetSuccessType::None);
+                client->add_tcp_data(&success, sizeof(Net_success));
+
+                sync_session_with_master(session);
                 break;
             }
             case MsgType::NetPlayerSetGameRuleInt:
@@ -341,7 +372,10 @@ void Net_slave::on_client_disconnect(Net_client* client) {
 
     // remove player from the session
     if (client->info.session_id != 0 && _session_id_lookup.find(client->info.session_id) != _session_id_lookup.end()) {
-        _session_id_lookup[client->info.session_id]->disconnect(client->info.client_id);
+        Net_session* session = _session_id_lookup[client->info.session_id];
+        session->disconnect(client->info.client_id);
+
+        sync_session_with_master(session);
     }
 
     // remove the player from the UDP server lookup tables
@@ -464,16 +498,6 @@ bool Net_slave::connect_to_master() {
     return true;
 }
 
-void Net_slave::clear_old_sessions(std::chrono::time_point<std::chrono::high_resolution_clock>& now) {
-    for (int i = 0; i < _sessions.size(); ++i) {
-        if (!_sessions[i]->is_old(now)) {
-            continue;
-        }
-
-
-    }
-}
-
 /// <summary>
 /// Called once per tick
 /// + Read from master TCP socket
@@ -489,12 +513,6 @@ void Net_slave::update() {
     }
 
     auto now = std::chrono::high_resolution_clock::now();
-
-    if (_tick_check++ > 600) {
-        // clear out old sessions
-        _tick_check = 0;
-        clear_old_sessions(now);
-    }
 
     // read all player TCP data
     _tcp.read();

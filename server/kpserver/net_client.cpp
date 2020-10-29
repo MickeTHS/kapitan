@@ -130,6 +130,22 @@ bool Net_client::log_activity() {
 	return _num_flooded_packets < 20;
 }
 
+void Net_client::reset_session() {
+	_net_session_id = 0;
+}
+
+bool Net_client::is_in_session() const {
+	return _net_session_id != 0;
+}
+
+void Net_client::set_session_id(uint32_t session_id) {
+	_net_session_id = session_id;
+}
+
+uint32_t Net_client::get_session_id() const {
+	return _net_session_id;
+}
+
 int Net_client::mseconds_since_activity() const {
 	auto now = std::chrono::high_resolution_clock::now();
 
@@ -146,6 +162,3 @@ SOCKET Net_client::get_udp_socket() const {
 	return info.udp_socket;
 }
 
-void Net_client::print() const {
-	info.print();
-}

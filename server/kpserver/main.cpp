@@ -38,18 +38,19 @@
 #include "net_master.h"
 #include "net_slave.h"
 #include "process_stats.h"
+#include "trace.h"
 
 
 int main(int argc , char *argv[])
 {
-    printf("KPSERVER v0.1\n");
+    TRACE("KPSERVER v0.1\n");
 
     char ini_filename[128];
 
     if (argc < 3) {
-        printf("ERROR: Invalid argument count\n");
+        TRACE("ERROR: Invalid argument count\n");
         
-        printf("Usage: ./kpserver -ini master_eu.ini [-v]\n");
+        TRACE("Usage: ./kpserver -ini master_eu.ini [-v]\n");
         return 0;
     }
 
@@ -67,7 +68,7 @@ int main(int argc , char *argv[])
     auto node = ini.get_me();
 
     if (node == nullptr) {
-        printf("ERROR on startup: ini file missing is_me\n");
+        TRACE("ERROR on startup: ini file missing is_me\n");
         return 0;
     }
 
@@ -86,12 +87,12 @@ int main(int argc , char *argv[])
     int64_t idle_time = 0;
 
     if (node->is_master) {
-        printf("[MAIN][MASTER][STARTUP]\n");
+        TRACE("[MAIN][MASTER][STARTUP]\n");
 
         master_node = std::make_unique<Net_master>(&ini);
     }
     else {
-        printf("[MAIN][SLAVE][STARTUP]\n");
+        TRACE("[MAIN][SLAVE][STARTUP]\n");
 
         // When the slave node is created, it will also create a udp socket
         slave_node = std::make_unique<Net_slave>(&ini, stats.get());
@@ -101,7 +102,7 @@ int main(int argc , char *argv[])
         // This will connect to the master node
         // Also sends the slave node configuration to the master node
         if (!slave_node->init()) {
-            printf("[SLAVE][MAIN][ERROR][Unable to initialize Net-Slave]\n");
+            TRACE("[SLAVE][MAIN][ERROR][Unable to initialize Net-Slave]\n");
             return 0;
         }
     }

@@ -29,10 +29,12 @@ enum class MsgType {
     NetPlayerHostSessionResponseReject,
     NetPlayerJoinSessionRequest,
     NetPlayerJoinSessionResponse,
+    NetPlayerLeaveSessionRequest,
     NetPlayerJoinNotify,
     NetPlayerLeaveSession,
     NetPlayerSession,
     NetError,
+    NetSuccess,
     NetSlaveHealthReport,
     NetPlayerSetGameRuleInt,
     NetUDPEstablish,
@@ -49,6 +51,9 @@ enum class NetErrorType {
     SessionIsFull
 };
 
+enum class NetSuccessType {
+    None = 0
+};
 
 enum class NetMasterToSlaveCommand {
     None = 0,
@@ -56,6 +61,13 @@ enum class NetMasterToSlaveCommand {
 };
 
 //// ########## COMMON PACKETS ################### ////
+
+struct Net_success {
+    uint8_t type;
+    uint8_t msg;
+
+    Net_success(NetSuccessType success_msg) : type((uint8_t)MsgType::NetSuccess), msg((uint8_t)success_msg) { }
+};
 
 struct Net_error {
     uint8_t type;
@@ -139,21 +151,6 @@ struct Net_authenticate_slave {
 
     void set_buffer(std::vector<uint8_t>& data, uint32_t off) {
         memcpy(&data[off], this, sizeof(Net_authenticate_slave));
-    }
-};
-
-/// <summary>
-/// When a player want to leave a session
-/// </summary>
-struct Net_player_leave_session {
-    uint8_t type;
-    uint32_t player_id;
-    uint32_t session_id;
-
-    Net_player_leave_session() : type((uint8_t)MsgType::NetPlayerLeaveSession), player_id(0), session_id(0) { }
-
-    Net_player_leave_session(const std::vector<uint8_t>& data, uint32_t off) {
-        memcpy(this, &data[off], sizeof(Net_player_leave_session));
     }
 };
 
@@ -288,6 +285,27 @@ struct Net_player_join_session_response {
 };
 
 /// <summary>
+/// When a player leaves a session
+/// </summary>
+struct Net_player_leave_session_request {
+    uint8_t type;
+    uint32_t player_id;
+    uint32_t session_id;
+
+    Net_player_leave_session_request() : type((uint8_t)MsgType::NetPlayerLeaveSessionRequest), session_id(0), player_id(0) {}
+
+    Net_player_leave_session_request(const std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(this, &data[off], sizeof(Net_player_leave_session_request));
+    }
+
+    void set_buffer(std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(&data[off], this, sizeof(Net_player_leave_session_request));
+    }
+};
+
+
+
+/// <summary>
 /// Sent to a master node to get a "good" slave node
 /// Should send back a Net_slave_config to the player
 /// </summary>
@@ -379,7 +397,7 @@ struct Net_slave_health_snapshot {
         printf("---- Health report:\n");
         printf("Pct RAM used: %f\n", ((float)pct_virt_process_ram_used / 10000.0f));
         printf("Pct LAG ticks: %f\n", ((float)pct_good_vs_lag_ticks / 10000.0f));
-        printf("Avg Idle time: %ld\n", avg_tick_idle_time);
+        printf("Avg Idle time: %lld\n", avg_tick_idle_time);
         printf("Pct CPU Load: %f\n", 0.0f);
         printf("Num players: %d\n", num_connected_players);
     }

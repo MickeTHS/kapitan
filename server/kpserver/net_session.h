@@ -17,6 +17,10 @@ struct Udp_server;
 struct Net_client_info;
 struct Net_client;
 
+struct Net_session_rules {
+    
+};
+
 /// a group is a collection of clients that will be playing a private game
 /// that once it has been started, only these clients will be able to 
 /// communicate among each other
@@ -58,6 +62,8 @@ struct Net_session {
     void set_num_players(uint8_t num_players);
 
     uint8_t get_num_players() const;
+
+    void remove_player(Net_client* client);
 private:
     void handle_inc_pos(const std::vector<uint8_t>& data);
 

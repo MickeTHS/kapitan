@@ -41,7 +41,7 @@ private:
     bool find_client(Net_client* client) const;
     Net_session* find_client_session(Net_client* client) const;
     Net_session* find_empty_session() const;
-    void clear_old_sessions(std::chrono::time_point<std::chrono::high_resolution_clock>& now);
+
     void sync_session_with_master(Net_session* session);
     
     Tcp_server                                  _tcp;

@@ -1,6 +1,9 @@
 #include "ini_file.h"
+
 #include <string>
 #include <vector>
+
+#include "trace.h"
 
 Ini_node::Ini_node() {
     hostname = "localhost";
@@ -25,13 +28,13 @@ Ini_node::Ini_node() {
 
 void Ini_node::print() const {
     if (is_master) {
-        printf("[MASTER]\n");
+        TRACE("[MASTER]\n");
     }
     else {
-        printf("[SLAVE]\n");
+        TRACE("[SLAVE]\n");
     }
 
-    printf("name: %s, hostname: %s, id: %d, master: %s, tcp_port: %d, udp_port: %d\n", 
+    TRACE("name: %s, hostname: %s, id: %d, master: %s, tcp_port: %d, udp_port: %d\n",
         name.c_str(),
         hostname.c_str(),
         id,

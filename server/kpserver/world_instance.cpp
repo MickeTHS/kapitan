@@ -1,5 +1,7 @@
 #include "world_instance.h"
 
+#include "net_session_rules.h"
+
 World_instance::World_instance() {
     
 }

@@ -82,9 +82,6 @@ struct Net_client_info {
 	uint16_t			udp_port;
 	char				username[64];
 
-	void print() const {
-		printf("[NET-CLIENT][fd: %d][p: %d][ip: %s]\n", socket, port, ip.c_str());
-	}
 };
 
 struct Net_client {
@@ -116,6 +113,14 @@ struct Net_client {
 	
 	Net_client_info     info;
 
+	void reset_session();
+
+	bool is_in_session() const;
+
+	void set_session_id(uint32_t session_id);
+
+	uint32_t get_session_id() const;
+
 private:
 
 	std::vector<uint8_t>	_tcp_data_buffer;
@@ -126,6 +131,8 @@ private:
 
 	uint32_t				_id;
 	int						_num_flooded_packets;
+
+	uint32_t				_net_session_id;
 	
 	std::chrono::time_point<std::chrono::high_resolution_clock> _prev_activity;
 };

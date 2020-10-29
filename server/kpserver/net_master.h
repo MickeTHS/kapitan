@@ -68,7 +68,7 @@ struct Net_slave_info {
     //void keepalive();
 
     void add_session(uint32_t id, const char* code);
-    void set_session(uint32_t id, const char* code);
+    void set_session(uint32_t id, const char* code, uint32_t num_players);
    
     //void clear_old_sessions();
 

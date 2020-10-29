@@ -55,6 +55,7 @@ set(KPSERVER_SRC_FILES
     tcp_client.h
     trace.cpp
     trace.h
+    net_session_rules.h
 )
 
 if(WIN32)

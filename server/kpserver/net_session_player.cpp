@@ -37,3 +37,15 @@ bool Net_session_player::is_valid_for_play() const {
 
     return false;
 }
+
+void Net_session_player::reset() {
+    net_player_short_id = 0;
+    entity_session_id = 0;
+    net_session_id = 0;
+    net_player_id = 0;
+    net_client_id = 0;
+    node_slave_id = 0;
+    client_connection = 0;
+
+    is_set = false;
+}

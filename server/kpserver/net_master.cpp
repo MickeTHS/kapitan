@@ -116,6 +116,11 @@ Net_slave_info* Net_master::get_slave(Net_client* client) {
     return _slave_by_client_id[client->info.client_id];
 }
 
+/// <summary>
+/// When the client has authenticated correctly, we add it to our lookups so we can keep track of them
+/// </summary>
+/// <param name="client"></param>
+/// <param name="auth"></param>
 void Net_master::add_authenticated_slave(Net_client* client, const Net_authenticate_slave& auth) {
     client->info.type = NetClientType::SlaveNode;
 
@@ -135,6 +140,17 @@ void Net_master::add_authenticated_slave(Net_client* client, const Net_authentic
     TRACE("[NET-MASTER][New slave node registered successfully]\n");
 }
 
+/// <summary>
+/// When we get TCP data it can be either from players or from slaves
+/// client->info.type determines who is what
+/// if the type is NetClientType::Unauthenticated, we dont know and we
+/// wait for authentication
+/// slaves authenticates using a master password
+/// players authenticate using a client password
+/// </summary>
+/// <param name="client"></param>
+/// <param name="data"></param>
+/// <param name="data_len"></param>
 void Net_master::on_inc_tcp_data(Net_client* client, const std::vector<uint8_t>& data, int32_t data_len) {
     
     uint32_t pos = 0;
@@ -144,8 +160,8 @@ void Net_master::on_inc_tcp_data(Net_client* client, const std::vector<uint8_t>&
         MsgType type = (MsgType)((uint8_t)data[pos]);
 
         if (client->info.type == NetClientType::Unauthenticated) {
-            // we only allow authentication packets
-
+            // we only allow authentication packets if the client is unauthenticated
+            // if the client isnt able to authenticate, we disconnect it directly
             switch (type) {
             case MsgType::NetAuthenticatePlayer:
             {
@@ -277,7 +293,7 @@ void Net_master::on_inc_tcp_data(Net_client* client, const std::vector<uint8_t>&
                 pos += sizeof(Net_from_slave_sync_session);
                 len -= sizeof(Net_from_slave_sync_session);
 
-                slave->set_session(session.session_id, session.code);
+                slave->set_session(session.session_id, session.code, session.num_players);
 
                 break;
             }
@@ -344,7 +360,7 @@ Net_slave_info::Net_slave_info(Net_client* client_, uint32_t slave_id_, uint32_t
         num_sessions(num_sessions_),
         num_players(0),
         tcp_port(0) {
-    
+    memset(ip, 0, 64);
 }
 
 void Net_slave_info::set_health_rating(const Net_slave_health_snapshot& snap) {
@@ -384,7 +400,7 @@ void Net_slave_info::add_session(uint32_t id, const char* code) {
 /// </summary>
 /// <param name="id"></param>
 /// <param name="code"></param>
-void Net_slave_info::set_session(uint32_t id, const char* code) {
+void Net_slave_info::set_session(uint32_t id, const char* code, uint32_t num_players) {
     if (_session_id_lookup.find(id) == _session_id_lookup.end()) {
         return;
     }
@@ -398,6 +414,7 @@ void Net_slave_info::set_session(uint32_t id, const char* code) {
     
     strcpy(session->code, code);
     session->set_session_hash();
+    session->num_players = num_players;
     _session_code_lookup[session->session_code_hash] = session;
 }
 

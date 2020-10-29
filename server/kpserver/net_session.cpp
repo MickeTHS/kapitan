@@ -47,6 +47,7 @@ void Net_session::disconnect(uint32_t client_id) {
     for (int i = 0; i < _players.size(); ++i) {
         if (_players[i].net_client_id == client_id) {
             _players.erase(_players.begin() + i);
+            _num_players--;
             return;
         }
     }
@@ -87,6 +88,16 @@ void Net_session::set_num_players(uint8_t num_players) {
 
 uint8_t Net_session::get_num_players() const {
     return _num_players;
+}
+
+void Net_session::remove_player(Net_client* client) {
+    for (auto& player : _players) {
+        if (player.net_client_id == client->get_id()) {
+            player.reset();
+            _num_players--;
+            return;
+        }
+    }
 }
 
 void Net_session::broadcast_udp(void* data, uint32_t len) {

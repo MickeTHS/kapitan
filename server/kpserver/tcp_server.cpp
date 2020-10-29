@@ -1,9 +1,10 @@
 #include "tcp_server.h"
 
-#include <iostream>
 #include <thread>
 #include <errno.h>
+#include <stdio.h>
 
+#include "trace.h"
 
 #define FD_INVALID -1
 
@@ -12,7 +13,7 @@ void connection_info(struct sockaddr_in& client, Net_client_info& info)
     char* connected_ip = inet_ntoa(client.sin_addr);
     int port = ntohs(client.sin_port);
 
-    std::cout << "-[IP:" << connected_ip << ", Connected on PORT:" << port << "]" << std::endl;
+    TRACE("-[IP: %s , Connected on PORT: %d]\n", connected_ip, port);
 
     info.int_ip = (uint32_t)ntohl(client.sin_addr.s_addr);
     info.ip = std::string(connected_ip);
@@ -56,7 +57,7 @@ void Tcp_server::print_error() {
         NULL, WSAGetLastError(),
         MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
         (LPWSTR)&s, 0, NULL);
-    fprintf(stderr, "%S\n", s);
+    TRACE("%S\n", s);
     LocalFree(s);
 #else
     printf("Error: %s\n", strerror(errno));
@@ -64,7 +65,7 @@ void Tcp_server::print_error() {
 }
 
 bool Tcp_server::init(uint16_t port) {
-    printf("[CON-TCP][INIT]\n");
+    TRACE("[CON-TCP][INIT]\n");
     _port = port;
     _address.sin_family = AF_INET;
     _address.sin_addr.s_addr = INADDR_ANY;
@@ -80,7 +81,7 @@ bool Tcp_server::init(uint16_t port) {
     int wsa_result = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (wsa_result != 0) {
         
-        printf("[CON-TCP][INIT][FAIL][WSASTARTUP]:\n");
+        TRACE("[CON-TCP][INIT][FAIL][WSASTARTUP]:\n");
         print_error();
 
         return false;
@@ -92,7 +93,7 @@ bool Tcp_server::init(uint16_t port) {
     //create a master socket  
     if ((_master_socket = socket(AF_INET, SOCK_STREAM, 0)) == 0)
     {
-        printf("[CON-TCP][INIT][FAIL][SOCKET]:\n");
+        TRACE("[CON-TCP][INIT][FAIL][SOCKET]:\n");
         print_error();
         exit(EXIT_FAILURE);
     }
@@ -102,7 +103,7 @@ bool Tcp_server::init(uint16_t port) {
     if (setsockopt(_master_socket, SOL_SOCKET, SO_REUSEADDR, (char*)&opt,
         sizeof(opt)) < 0)
     {
-        printf("[CON-TCP][INIT][FAIL][REUSEADDR]:\n");
+        TRACE("[CON-TCP][INIT][FAIL][REUSEADDR]:\n");
         print_error();
 
         exit(EXIT_FAILURE);
@@ -111,7 +112,7 @@ bool Tcp_server::init(uint16_t port) {
     //bind the socket to localhost port con_port  
     if (bind(_master_socket, (struct sockaddr*)&_address, sizeof(_address)) < 0)
     {
-        printf("[CON-TCP][INIT][FAIL][BIND]:\n");
+        TRACE("[CON-TCP][INIT][FAIL][BIND]:\n");
         print_error();
 
         exit(EXIT_FAILURE);
@@ -120,7 +121,7 @@ bool Tcp_server::init(uint16_t port) {
     //try to specify maximum of 100 pending connections for the master socket  
     if (listen(_master_socket, 100) < 0)
     {
-        printf("[CON-TCP][INIT][FAIL][LISTEN]:\n");
+        TRACE("[CON-TCP][INIT][FAIL][LISTEN]:\n");
         print_error();
 
         exit(EXIT_FAILURE);
@@ -130,7 +131,7 @@ bool Tcp_server::init(uint16_t port) {
 #ifdef WIN32
     if (setsockopt(_master_socket, SOL_SOCKET, SO_REUSEADDR, (const char*)&option, sizeof(option)) < 0) {
         //WSACleanup();
-        printf("[CON-TCP][INIT][FAIL][REUSEADDR]:\n");
+        TRACE("[CON-TCP][INIT][FAIL][REUSEADDR]:\n");
         print_error();
         return false;
     }
@@ -139,7 +140,7 @@ bool Tcp_server::init(uint16_t port) {
 #endif 
 
     _addrlen = sizeof(_address);
-    printf("[CON-TCP][INIT][OK][p: %d]\n", _port);
+    TRACE("[CON-TCP][INIT][OK][p: %d]\n", _port);
 
     return true;
 }
@@ -191,7 +192,7 @@ int Tcp_server::read() {
 
     if ((activity < 0) && (errno != EINTR))
     {
-        printf("[CON-TCP][READ][SELECT][FAIL][h:%s][p:%d][l:%d]\n");
+        TRACE("[CON-TCP][READ][SELECT][FAIL][h:%s][p:%d][l:%d]\n");
         print_error();
     }
 
@@ -202,7 +203,7 @@ int Tcp_server::read() {
         if ((new_socket = accept(_master_socket,
             (struct sockaddr*)&_address, (socklen_t*)&_addrlen)) < 0)
         {
-            printf("[CON-TCP][READ][ACCEPT][FAIL][h:%s][p:%d][l:%d]\n");
+            TRACE("[CON-TCP][READ][ACCEPT][FAIL][h:%s][p:%d][l:%d]\n");
             exit(EXIT_FAILURE);
         }
 
@@ -212,7 +213,7 @@ int Tcp_server::read() {
         info.tcp_socket = new_socket;
 
         if (_blocked_clients.find(info.int_ip) != _blocked_clients.end()) {
-            printf("Client is blocked\n");
+            TRACE("Client is blocked\n");
 #ifdef WIN32
             shutdown(new_socket, SD_BOTH);
             closesocket(new_socket);
@@ -221,9 +222,8 @@ int Tcp_server::read() {
 #endif
         }
         else {
-            printf("[CON-TCP][READ][NEW-CONNECTION][OK]");
-            info.print();
-
+            TRACE("[CON-TCP][READ][NEW-CONNECTION][OK]");
+            
             std::unique_ptr<Net_client> client = std::make_unique<Net_client>(info, Net_client::__ID_COUNTER++);
             Net_client* client_ptr = client.get();
 
@@ -254,7 +254,7 @@ int Tcp_server::read() {
                 case WSAECONNABORTED:
                 case WSAECONNRESET:
 #endif
-                    printf("disconnected\n");
+                    TRACE("disconnected\n");
                     disconnect(client);
                     --i;
                     continue;
@@ -268,10 +268,10 @@ int Tcp_server::read() {
             }
 
             if (valread > 0) {
-                printf("read: %d\n", valread);
+                TRACE("read: %d\n", valread);
 
                 if (!client->log_activity()) { // force shutdown for package flooding
-                    printf("Disconnect due to packet flooding\n");
+                    TRACE("Disconnect due to packet flooding\n");
                     disconnect(client);
                     _blocked_clients[client->info.int_ip] = true;
                     --i;
@@ -319,7 +319,7 @@ bool Tcp_server::send_data_to_all(const std::vector<uint8_t>& data, size_t len) 
     for (int i = 0; i < _clients.size(); ++i) {
         sd = _clients[i].get()->get_tcp_socket();
         if ((bytes_sent = send(sd, (const char*)&data[0], len, 0)) != len) {
-            printf("[CON-TCP][SEND_DATA_TO_ALL][ERROR][Unable to send to client socket]\n");
+            TRACE("[CON-TCP][SEND_DATA_TO_ALL][ERROR][Unable to send to client socket]\n");
             success = false;
         }
     }
