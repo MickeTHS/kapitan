@@ -65,7 +65,7 @@ void Tcp_server::print_error() {
 }
 
 bool Tcp_server::init(uint16_t port) {
-    TRACE("[CON-TCP][INIT]\n");
+    TRACE("[CON-TCP][INIT][%d]\n", port);
     _port = port;
     _address.sin_family = AF_INET;
     _address.sin_addr.s_addr = INADDR_ANY;
@@ -147,6 +147,7 @@ bool Tcp_server::init(uint16_t port) {
 
 
 int Tcp_server::read() {
+    
     // clear our block list every once in a while
     if (_clear_tick_counter++ > 100) {
         _blocked_clients.clear();

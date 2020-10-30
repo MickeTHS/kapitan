@@ -52,8 +52,6 @@ struct Tcp_client {
 
     void send_buffer();
 
-    bool send_data(const std::vector<uint8_t>& buffer, int len);
-
     void disconnect();
 
     bool is_initialized() const;

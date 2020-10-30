@@ -48,7 +48,8 @@ enum class NetErrorType {
     NoAvailableSessions,
     Banned,
     AlreadyHaveSession,
-    SessionIsFull
+    SessionIsFull,
+    NoAvailableSlaves
 };
 
 enum class NetSuccessType {

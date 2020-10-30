@@ -74,7 +74,9 @@ void Udp_server::print_error() {
 }
 
 bool Udp_server::init(int port) {
-	TRACE("[POS-UDP][INIT]\n");
+	TRACE("[UDP-SERVER][INIT]\n");
+	_port = port;
+
 	_addr.sin_family = AF_INET;
 	_addr.sin_addr.s_addr = htonl(INADDR_ANY); // N.B.: differs from sender 
 	_addr.sin_port = htons(_port);
@@ -94,7 +96,7 @@ bool Udp_server::init(int port) {
 #endif
 	// create what looks like an ordinary UDP socket
 	if ((_socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-		TRACE("[POS-UDP][INIT][SOCKET][FAIL]\n");
+		TRACE("[UDP-SERVER][INIT][SOCKET][FAIL]\n");
 		
 #ifdef WIN32
 		//WSACleanup();
@@ -105,7 +107,7 @@ bool Udp_server::init(int port) {
 #ifdef WIN32
 	// allow multiple sockets to use the same PORT number 
 	if (setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, (const char*)&yes, sizeof(yes)) < 0) {
-		TRACE("[POS-UDP][INIT][REUSEADDR][FAIL]\n");
+		TRACE("[UDP-SERVER][INIT][REUSEADDR][FAIL]\n");
 
 		//WSACleanup();
 
@@ -114,7 +116,7 @@ bool Udp_server::init(int port) {
 #else
 	int enable = 1;
 	if (setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
-		TRACE("[POS-UDP][INIT][REUSEADDR][FAIL]\n");
+		TRACE("[UDP-SERVER][INIT][REUSEADDR][FAIL]\n");
 
 		return false;
 	}
@@ -122,7 +124,7 @@ bool Udp_server::init(int port) {
 #ifdef SO_REUSEPORT
 
 	if (setsockopt(_socket, SOL_SOCKET, SO_REUSEPORT, &enable, sizeof(int)) < 0) {
-		TRACE("[POS-UDP][INIT][REUSEPORT][FAIL]\n");
+		TRACE("[UDP-SERVER][INIT][REUSEPORT][FAIL]\n");
 
 		return false;
 	}
@@ -133,7 +135,7 @@ bool Udp_server::init(int port) {
 	
 	// bind to receive address 
 	if (::bind(_socket, (struct sockaddr*)&_addr, sizeof(_addr)) < 0) {
-		TRACE("[POS-UDP][INIT][BIND][FAIL]\n");
+		TRACE("[UDP-SERVER][INIT][BIND][FAIL]\n");
 #ifdef WIN32
 		//WSACleanup();
 #endif
@@ -148,13 +150,13 @@ bool Udp_server::init(int port) {
 	int status = fcntl(_socket, F_SETFL, fcntl(_socket, F_GETFL, 0) | O_NONBLOCK);
 
 	if (status == -1) {
-		TRACE("[POS-UDP][INIT][FIONBIO][FAIL]\n");
+		TRACE("[UDP-SERVER][INIT][FIONBIO][FAIL]\n");
 		// handle the error.  By the way, I've never seen fcntl fail in this way
 	}
 
 #endif
 
-	TRACE("[POS-UDP][INIT][OK][p: %d]\n", _port);
+	TRACE("[UDP-SERVER][INIT][OK][p: %d]\n", _port);
 
     return true;
 }

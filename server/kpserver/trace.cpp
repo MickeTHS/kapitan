@@ -15,7 +15,7 @@
 
 		bf[4095] = 0;
 
-        printf("%s\n", bf);
+        printf("%s", bf);
 	}
 #endif
 

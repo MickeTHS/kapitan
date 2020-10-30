@@ -18,6 +18,8 @@
 
 #define BUFFER_SIZE 2000
 
+#include "trace.h"
+
 uint32_t Net_client::__ID_COUNTER = 0;
 
 Net_client::Net_client(Net_client_info info_, uint32_t id) 

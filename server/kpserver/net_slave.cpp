@@ -317,6 +317,20 @@ bool Net_slave::init() {
     return true;
 }
 
+bool Net_slave::validate_ini() {
+    if (_my_node->udp_port == 0) {
+        TRACE("ERROR: ini must include udp_port\n");
+        return false;
+    }
+
+    if (_my_node->tcp_port == 0) {
+        TRACE("ERROR: ini must include tcp_port\n");
+        return false;
+    }
+
+    return true;
+}
+
 /// <summary>
 /// Create our sessions during startup, If all sessions are marked as running
 /// then we dont allow player host requests on this node.
@@ -416,9 +430,7 @@ void Net_slave::handle_master_command(const Net_master_to_slave_command& command
             msg.set_buffer(_data_buffer, 0);
             msg.print();
 
-            if (_master_connection.send_data(_data_buffer, sizeof(Net_slave_health_snapshot))) {
-                TRACE("[NET-SLAVE][HANDLE-MASTER-COMMAND][Health report sent ok]\n");
-            }
+            _master_connection.add_data(&msg, sizeof(Net_slave_health_snapshot));
 
             break;
         }
@@ -467,12 +479,9 @@ bool Net_slave::connect_to_master() {
     // that authenticates with the master
     Net_authenticate_slave reg(_my_node->id, _master.node->master_password);
     reg.set_buffer(_data_buffer, 0);
-    
-    if (!_master_connection.send_data(_data_buffer, sizeof(Net_authenticate_slave))) {
-        TRACE("[NET-SLAVE][INIT][ERROR][Unable to authenticate with the master]\n");
-        return false;
-    }
 
+    _master_connection.add_data(&reg, sizeof(Net_authenticate_slave));
+    
     TRACE("[NET-SLAVE][INIT][Authentication packet sent]\n");
 
     // send our configuration
@@ -488,12 +497,18 @@ bool Net_slave::connect_to_master() {
     config.udp_port = _my_node->udp_port;
     config.node_id = _my_node->id;
     
+    _master_connection.add_data(&config, sizeof(Net_slave_config));
+    
+    /*
+    
     config.set_buffer(_data_buffer, sizeof(Net_slave_config));
 
     if (!_master_connection.send_data(_data_buffer, sizeof(Net_slave_config))) {
         TRACE("[NET-SLAVE][INIT][ERROR][Unable to send slave config]\n");
         return false;
     }
+    
+    */
 
     return true;
 }

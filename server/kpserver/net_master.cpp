@@ -156,52 +156,62 @@ void Net_master::on_inc_tcp_data(Net_client* client, const std::vector<uint8_t>&
     uint32_t pos = 0;
     int32_t len = data_len;
 
-    while (data_len > 0) {
+    TRACE("datalen: %d\n", data_len);
+
+    while (len > 0) {
         MsgType type = (MsgType)((uint8_t)data[pos]);
+
+        TRACE("client: %d, pos: %d, type: %d, len: %d\n", client->info.client_id, pos, type, data_len);
 
         if (client->info.type == NetClientType::Unauthenticated) {
             // we only allow authentication packets if the client is unauthenticated
             // if the client isnt able to authenticate, we disconnect it directly
             switch (type) {
-            case MsgType::NetAuthenticatePlayer:
-            {
-                Net_authenticate_player auth(data, pos);
+                case MsgType::NetAuthenticatePlayer:
+                {
+                    Net_authenticate_player auth(data, pos);
 
-                if (auth.client_password == _my_node->client_password) {
-                    TRACE("[NET-MASTER][ON-INC-TCP-DATA][NetAuthenticatePlayer][SUCCESS]\n");
-                    client->info.type = NetClientType::Player;
+                    if (auth.client_password == _my_node->client_password) {
+                        TRACE("[NET-MASTER][ON-INC-TCP-DATA][NetAuthenticatePlayer][SUCCESS]\n");
+                        client->info.type = NetClientType::Player;
 
-                    pos += sizeof(Net_authenticate_player);
-                    len -= sizeof(Net_authenticate_player);
+                        pos += sizeof(Net_authenticate_player);
+                        len -= sizeof(Net_authenticate_player);
+
+                        Net_success success(NetSuccessType::None);
+
+                        client->add_tcp_data(&success, sizeof(Net_success));
+                        continue;
+                    }
+                    else {
+                        TRACE("[NET-MASTER][ON-INC-TCP-DATA][NetAuthenticatePlayer][FAIL][Invalid password]\n");
+                        _tcp.disconnect(client);
+                        return;
+                    }
+                    break;
                 }
-                else {
-                    TRACE("[NET-MASTER][ON-INC-TCP-DATA][NetAuthenticatePlayer][FAIL][Invalid password]\n");
-                    _tcp.disconnect(client);
-                    return;
-                }
-                break;
-            }
-            case MsgType::NetAuthenticateSlave:
-            {
-                Net_authenticate_slave auth(data, pos);
+                case MsgType::NetAuthenticateSlave:
+                {
+                    Net_authenticate_slave auth(data, pos);
+                
+                    pos += sizeof(Net_authenticate_slave);
+                    len -= sizeof(Net_authenticate_slave);
 
-                if (auth.master_password == _my_node->master_password) {
+                    if (auth.master_password != _my_node->master_password) {
+                        TRACE("[NET-MASTER][ON-INC-TCP-DATA][NetAuthenticateSlave][FAIL][Invalid master password]\n");
+                        _tcp.disconnect(client);
+
+                        return;
+                    }
+
                     TRACE("[NET-MASTER][ON-INC-TCP-DATA][NetAuthenticateSlave][SUCCESS]\n");
 
                     add_authenticated_slave(client, auth);
+                    continue;
                 }
-                else {
-                    TRACE("[NET-MASTER][ON-INC-TCP-DATA][NetAuthenticateSlave][FAIL][Invalid master password]\n");
-                    _tcp.disconnect(client);
-                    return;
-                }
-
-                pos += sizeof(Net_authenticate_slave);
-                len -= sizeof(Net_authenticate_slave);
-            }
-            default:
-                // disconnect
-                break;
+                default:
+                    // disconnect
+                    break;
             }
 
             TRACE("[NET-MASTER][ON-INC-TCP-DATA][ERROR][Client tried to send message without authenticated state]\n");
@@ -227,12 +237,21 @@ void Net_master::on_inc_tcp_data(Net_client* client, const std::vector<uint8_t>&
                 pos += sizeof(Net_player_slave_node_request);
                 len -= sizeof(Net_player_slave_node_request);
 
+                if (_slaves_health.size() == 0) {
+                    Net_error error(NetErrorType::NoAvailableSessions);
+
+                    client->add_tcp_data(&error, sizeof(Net_error));
+                    continue;
+                }
+
                 Net_slave_info* slave = _slaves_health[0].get();
 
                 Net_player_slave_node_response resp;
                 strcpy(resp.ip, slave->ip);
                 resp.slave_id = slave->slave_id;
                 resp.tcp_port = slave->tcp_port;
+
+                TRACE("Sending slave config: %s, %d, %d\n", slave->ip, slave->slave_id, slave->tcp_port);
                 
                 client->add_tcp_data(&resp, sizeof(Net_player_slave_node_response));
 
@@ -281,6 +300,25 @@ void Net_master::on_inc_tcp_data(Net_client* client, const std::vector<uint8_t>&
             }
 
             // ---------- SLAVE MESSAGES ------- //
+            case MsgType::NetSlaveConfig:
+            {
+                TRACE("[NET-MASTER][NetSlaveConfig]\n");
+
+                Net_slave_config config(data, pos);
+
+                pos += sizeof(Net_slave_config);
+                len -= sizeof(Net_slave_config);
+
+                Net_slave_info* slave = get_slave(client);
+
+                strcpy(slave->ip, config.hostname);
+                slave->tcp_port = config.tcp_port;
+                slave->udp_port = config.udp_port;
+                
+                TRACE("slave id: %d, config id: %d\n", slave->slave_id, config.node_id);
+
+                break;
+            }
             case MsgType::NetFromSlaveSyncSession: 
             {
                 // Keepalive messages are sent from the slave node to the master to indicate that everything is fine with the session
@@ -332,6 +370,10 @@ void Net_master::on_inc_tcp_data(Net_client* client, const std::vector<uint8_t>&
 
 void Net_master::update() {
     auto now = std::chrono::high_resolution_clock::now();
+
+    _tcp.read();
+
+    _tcp.send_client_data();
 
     // perform slave report ?
     if (_next_slave_report < now) {

@@ -17,7 +17,7 @@ Tcp_client::~Tcp_client() {
 }
 
 bool Tcp_client::init(const char* ip, const char* hostname, bool is_ip_set, int port) {
-    
+    TRACE("[TCP-CLIENT][INIT][%s][%d]\n", (is_ip_set ? ip : hostname), port);
     _socket = 0;
 
     struct sockaddr_in serv_addr; 
@@ -141,18 +141,6 @@ void Tcp_client::send_buffer() {
     }
 
     _data_buffer_pos = 0;
-}
-
-bool Tcp_client::send_data(const std::vector<uint8_t>& buffer, int len) {
-    size_t bytes_sent;
-    
-    if ((bytes_sent = send(_socket, (const char*)&buffer[0], len, 0)) != len) {
-        TRACE("[TCP-CLIENT][SEND_DATA][ERROR][Unable to send data]\n");
-        print_error();
-        return false;
-    }
-
-    return true;
 }
 
 void Tcp_client::set_on_data_callback(std::function<void(const std::vector<uint8_t>& data, int32_t len)> func) {

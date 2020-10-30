@@ -29,6 +29,7 @@ struct Net_slave {
     bool init();
     void update();
     void setup_sessions();
+    bool validate_ini();
 private:
     void on_inc_tcp_master_data(const std::vector<uint8_t>& data, int32_t data_len);
     void on_inc_client_udp_data(Net_client* client, const std::vector<uint8_t>& data, int32_t data_len);

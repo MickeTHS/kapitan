@@ -58,6 +58,7 @@ struct Net_slave_info {
     char            ip[64];
     
     uint16_t        tcp_port;
+    uint16_t        udp_port;
 
     Net_slave_info(Net_client* client_, uint32_t slave_id_, uint32_t session_id_start_range_, uint32_t num_sessions_);
 

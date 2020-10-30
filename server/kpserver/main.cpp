@@ -90,12 +90,20 @@ int main(int argc , char *argv[])
         TRACE("[MAIN][MASTER][STARTUP]\n");
 
         master_node = std::make_unique<Net_master>(&ini);
+
+        
     }
     else {
         TRACE("[MAIN][SLAVE][STARTUP]\n");
 
         // When the slave node is created, it will also create a udp socket
         slave_node = std::make_unique<Net_slave>(&ini, stats.get());
+        
+        if (!slave_node->validate_ini()) {
+            TRACE("Quitting because of invalid ini file\n");
+            return 0;
+        }
+
         slave_node->setup_sessions();
 
         // Initiate the slave node
