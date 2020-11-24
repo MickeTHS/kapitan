@@ -236,7 +236,6 @@ int Tcp_server::read() {
         }
     }
 
-    //for (auto client : _clients) {
     for (int i = 0; i < _clients.size(); ++i) {
         auto client = _clients[i].get();
 

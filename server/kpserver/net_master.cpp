@@ -94,22 +94,27 @@ void Net_master::remove_slave(Net_client* client) {
 /// The master will only have temporary Net_client connections, so this makes no sense
 /// </summary>
 /// <param name="client"></param>
-void Net_master::remove_player(Net_client* client) {
+void Net_master::remove_player(Net_client* client) 
+{
 
     // delete the client
-    if (client->info.client_id != 0 && _client_id_lookup.find(client->info.client_id) != _client_id_lookup.end()) {
+    if (client->info.client_id != 0 && _client_id_lookup.find(client->info.client_id) != _client_id_lookup.end()) 
+    {
         _client_id_lookup.erase(client->info.client_id);
     }
 
     // remove player from the session
-    if (client->info.session_id != 0 && _session_id_lookup.find(client->info.session_id) != _session_id_lookup.end()) {
+    if (client->info.session_id != 0 && _session_id_lookup.find(client->info.session_id) != _session_id_lookup.end()) 
+    {
         Net_slave_info* info = _session_id_lookup[client->info.session_id];
         info->num_players--;
     }
 }
 
-Net_slave_info* Net_master::get_slave(Net_client* client) {
-    if (_slave_by_client_id.find(client->info.client_id) == _slave_by_client_id.end()) {
+Net_slave_info* Net_master::get_slave(Net_client* client) 
+{
+    if (_slave_by_client_id.find(client->info.client_id) == _slave_by_client_id.end()) 
+    {
         return nullptr;
     }
 
@@ -121,10 +126,12 @@ Net_slave_info* Net_master::get_slave(Net_client* client) {
 /// </summary>
 /// <param name="client"></param>
 /// <param name="auth"></param>
-void Net_master::add_authenticated_slave(Net_client* client, const Net_authenticate_slave& auth) {
+void Net_master::add_authenticated_slave(Net_client* client, const Net_authenticate_slave& auth) 
+{
     client->info.type = NetClientType::SlaveNode;
 
-    if (_slave_by_slave_id.find(auth.slave_id) != _slave_by_slave_id.end()) {
+    if (_slave_by_slave_id.find(auth.slave_id) != _slave_by_slave_id.end()) 
+    {
         TRACE("[NET-MASTER][NOTICE][Authenticated slave is already registered]\n");
         return;
     }
@@ -151,44 +158,42 @@ void Net_master::add_authenticated_slave(Net_client* client, const Net_authentic
 /// <param name="client"></param>
 /// <param name="data"></param>
 /// <param name="data_len"></param>
-void Net_master::on_inc_tcp_data(Net_client* client, const std::vector<uint8_t>& data, int32_t data_len) {
-    
+void Net_master::on_inc_tcp_data(Net_client* client, const std::vector<uint8_t>& data, int32_t data_len) 
+{
     uint32_t pos = 0;
     int32_t len = data_len;
 
-    TRACE("datalen: %d\n", data_len);
-
-    while (len > 0) {
+    while (len > 0) 
+    {
         MsgType type = (MsgType)((uint8_t)data[pos]);
 
-        TRACE("client: %d, pos: %d, type: %d, len: %d\n", client->info.client_id, pos, type, data_len);
-
-        if (client->info.type == NetClientType::Unauthenticated) {
+        if (client->info.type == NetClientType::Unauthenticated) 
+        {
             // we only allow authentication packets if the client is unauthenticated
             // if the client isnt able to authenticate, we disconnect it directly
-            switch (type) {
+            switch (type) 
+            {
                 case MsgType::NetAuthenticatePlayer:
                 {
                     Net_authenticate_player auth(data, pos);
+                    pos += sizeof(Net_authenticate_player);
+                    len -= sizeof(Net_authenticate_player);
 
-                    if (auth.client_password == _my_node->client_password) {
-                        TRACE("[NET-MASTER][ON-INC-TCP-DATA][NetAuthenticatePlayer][SUCCESS]\n");
-                        client->info.type = NetClientType::Player;
-
-                        pos += sizeof(Net_authenticate_player);
-                        len -= sizeof(Net_authenticate_player);
-
-                        Net_success success(NetSuccessType::None);
-
-                        client->add_tcp_data(&success, sizeof(Net_success));
-                        continue;
-                    }
-                    else {
+                    if (auth.client_password != _my_node->client_password) 
+                    {
                         TRACE("[NET-MASTER][ON-INC-TCP-DATA][NetAuthenticatePlayer][FAIL][Invalid password]\n");
                         _tcp.disconnect(client);
+                        
                         return;
                     }
-                    break;
+
+                    TRACE("[NET-MASTER][ON-INC-TCP-DATA][NetAuthenticatePlayer][SUCCESS]\n");
+                    client->info.type = NetClientType::Player;
+
+                    Net_success success(NetSuccessType::Authentication);
+
+                    client->add_tcp_data(&success, sizeof(Net_success));
+                    continue;
                 }
                 case MsgType::NetAuthenticateSlave:
                 {
@@ -197,7 +202,8 @@ void Net_master::on_inc_tcp_data(Net_client* client, const std::vector<uint8_t>&
                     pos += sizeof(Net_authenticate_slave);
                     len -= sizeof(Net_authenticate_slave);
 
-                    if (auth.master_password != _my_node->master_password) {
+                    if (auth.master_password != _my_node->master_password) 
+                    {
                         TRACE("[NET-MASTER][ON-INC-TCP-DATA][NetAuthenticateSlave][FAIL][Invalid master password]\n");
                         _tcp.disconnect(client);
 
@@ -220,9 +226,10 @@ void Net_master::on_inc_tcp_data(Net_client* client, const std::vector<uint8_t>&
             return;
         }
 
-        switch (type) {
+        switch (type) 
+        {
 
-            // ---------- PLAYER MESSAGES ------- //
+            // ---------- PLAYER MESSAGES ---------- //
             case MsgType::NetPlayerSlaveNodeRequest: 
             {
                 TRACE("[NET-MASTER][NetPlayerSlaveNodeRequest]\n");
@@ -231,13 +238,11 @@ void Net_master::on_inc_tcp_data(Net_client* client, const std::vector<uint8_t>&
                 // just send a slave config
                 // But first we need to check that the player has been registered on the master node
 
-
-                //Net_player_slave_node_request req;
-
                 pos += sizeof(Net_player_slave_node_request);
                 len -= sizeof(Net_player_slave_node_request);
 
-                if (_slaves_health.size() == 0) {
+                if (_slaves_health.size() == 0) 
+                {
                     Net_error error(NetErrorType::NoAvailableSessions);
 
                     client->add_tcp_data(&error, sizeof(Net_error));
@@ -246,10 +251,12 @@ void Net_master::on_inc_tcp_data(Net_client* client, const std::vector<uint8_t>&
 
                 Net_slave_info* slave = _slaves_health[0].get();
 
-                Net_player_slave_node_response resp;
-                strcpy(resp.ip, slave->ip);
+                Net_player_slave_node_response resp(slave->slave_id, slave->ip, slave->tcp_port, slave->udp_port);
+                memcpy(resp.ip, slave->ip, 64);
+                
                 resp.slave_id = slave->slave_id;
                 resp.tcp_port = slave->tcp_port;
+                resp.udp_port = slave->udp_port;
 
                 TRACE("Sending slave config: %s, %d, %d\n", slave->ip, slave->slave_id, slave->tcp_port);
                 
@@ -257,38 +264,42 @@ void Net_master::on_inc_tcp_data(Net_client* client, const std::vector<uint8_t>&
 
                 break;
             }
-            case MsgType::NetPlayerJoinSessionRequest:
+            case MsgType::NetPlayerMasterJoinPrivateSessionRequest:
             {
-                TRACE("[NET-MASTER][NetPlayerJoinSessionRequest]\n");
+                TRACE("[NET-MASTER][NetPlayerMasterJoinPrivateSessionRequest]\n");
                 // when a session join request comes in to the master, it means
                 // its a private session that isnt listed
 
                 // We need to send a reply with the node config of the session
                 // When the client gets the response that the session was
                 // found at the provided node, it needs to connect to that noce
-                Net_player_join_session_request req(data, pos);
+                Net_player_master_join_private_session_request req(data, pos);
 
-                pos += sizeof(Net_player_join_session_request);
-                len -= sizeof(Net_player_join_session_request);
+                pos += sizeof(Net_player_master_join_private_session_request);
+                len -= sizeof(Net_player_master_join_private_session_request);
 
                 mmh::Hash_key key(req.code);
 
                 // Lookup the session code to find the slave node that the session is played on
-                if (_session_code_lookup.find(key.hash) != _session_code_lookup.end()) {
-                    TRACE("[NET-MASTER][NetPlayerJoinSessionRequest][OK]\n");
+                if (_session_code_lookup.find(key.hash) != _session_code_lookup.end()) 
+                {
+                    TRACE("[NET-MASTER][NetPlayerMasterJoinPrivateSessionRequest][OK]\n");
 
                     // we found the session
                     Net_slave_info* slave = _session_code_lookup[key.hash];
                     
-                    Net_player_slave_node_response resp;
-                    strcpy(resp.ip, slave->ip);
+                    Net_player_master_join_private_session_response resp;
+                    memcpy(resp.ip, slave->ip, 64);
+                    
                     resp.slave_id = slave->slave_id;
                     resp.tcp_port = slave->tcp_port;
-
+                    resp.udp_port = slave->udp_port;
+                    
                     // the client now has all the information needed to connect to the slave node
-                    client->add_tcp_data(&resp, sizeof(Net_player_slave_node_response));
+                    client->add_tcp_data(&resp, sizeof(Net_player_master_join_private_session_response));
                 }
-                else {
+                else 
+                {
                     TRACE("[NET-MASTER][ERROR][Session not found]\n");
                     Net_error error(NetErrorType::SessionNotFound);
                 
@@ -310,12 +321,13 @@ void Net_master::on_inc_tcp_data(Net_client* client, const std::vector<uint8_t>&
                 len -= sizeof(Net_slave_config);
 
                 Net_slave_info* slave = get_slave(client);
-
-                strcpy(slave->ip, config.hostname);
+                memcpy(slave->ip, config.ip, 64);
+                memcpy(slave->hostname, config.hostname, 64);
+                
                 slave->tcp_port = config.tcp_port;
                 slave->udp_port = config.udp_port;
                 
-                TRACE("slave id: %d, config id: %d\n", slave->slave_id, config.node_id);
+                TRACE("slave id: %d, config id: %d, ip: %s\n", slave->slave_id, config.node_id, slave->ip);
 
                 break;
             }
@@ -331,6 +343,7 @@ void Net_master::on_inc_tcp_data(Net_client* client, const std::vector<uint8_t>&
                 pos += sizeof(Net_from_slave_sync_session);
                 len -= sizeof(Net_from_slave_sync_session);
 
+                slave->add_session_if_not_exists(session.session_id, session.code);
                 slave->set_session(session.session_id, session.code, session.num_players);
 
                 break;
@@ -340,7 +353,8 @@ void Net_master::on_inc_tcp_data(Net_client* client, const std::vector<uint8_t>&
                 TRACE("[NET-MASTER][NetSlaveHealthReport][Got health report from slave]\n");
                 auto slave = get_slave(client);
 
-                if (slave == nullptr) {
+                if (slave == nullptr) 
+                {
                     TRACE("[NET-MASTER][NetSlaveHealthReport][ERROR][Cant find slave with client_id: %d]\n", client->info.client_id);
                     return;
                 }
@@ -401,8 +415,10 @@ Net_slave_info::Net_slave_info(Net_client* client_, uint32_t slave_id_, uint32_t
         session_id_start_range(session_id_start_range_),
         num_sessions(num_sessions_),
         num_players(0),
-        tcp_port(0) {
-    memset(ip, 0, 64);
+        tcp_port(0),
+        udp_port(0),
+        ip("") {
+    
 }
 
 void Net_slave_info::set_health_rating(const Net_slave_health_snapshot& snap) {
@@ -425,9 +441,13 @@ Net_session_info* Net_slave_info::get_session(uint32_t session_id) {
 /// </summary>
 /// <param name="id"></param>
 /// <param name="code"></param>
-void Net_slave_info::add_session(uint32_t id, const char* code) {
+void Net_slave_info::add_session_if_not_exists(uint32_t id, const char* code) {
+    if (_session_id_lookup.find(id) != _session_id_lookup.end()) {
+        return;
+    }
+
     auto session = std::make_unique<Net_session_info>();
-    strcpy(session->code, code);
+    memcpy(session->code, code, 8);
     session->id = id;
     session->set_session_hash();
 
@@ -454,7 +474,7 @@ void Net_slave_info::set_session(uint32_t id, const char* code, uint32_t num_pla
         _session_code_lookup.erase(session->session_code_hash);
     }
     
-    strcpy(session->code, code);
+    memcpy(session->code, code, 8);
     session->set_session_hash();
     session->num_players = num_players;
     _session_code_lookup[session->session_code_hash] = session;

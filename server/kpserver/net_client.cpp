@@ -19,6 +19,7 @@
 #define BUFFER_SIZE 2000
 
 #include "trace.h"
+#include "udp_server.h"
 
 uint32_t Net_client::__ID_COUNTER = 0;
 
@@ -27,8 +28,11 @@ Net_client::Net_client(Net_client_info info_, uint32_t id)
 		_tcp_data_buffer_pos(0),
 		_udp_data_buffer_pos(0),
 		_id(id),
-		info(info_) {
+		info(info_),
+		_net_session_id(0) {
 	
+	info.client_id = id;
+
 	_tcp_data_buffer.resize(BUFFER_SIZE);
 	_udp_data_buffer.resize(BUFFER_SIZE);
 }
@@ -42,12 +46,8 @@ Net_client::~Net_client() {
 	//WSACleanup();
 	shutdown(info.tcp_socket, SD_BOTH);
 	closesocket(info.tcp_socket);
-
-	shutdown(info.udp_socket, SD_BOTH);
-	closesocket(info.udp_socket);
 #else
 	close(info.tcp_socket);
-	close(info.udp_socket);
 #endif
 }
 
@@ -62,6 +62,7 @@ void Net_client::generate_udp_code() {
 }
 
 void Net_client::add_tcp_data(void* data, uint32_t len) {
+	TRACE("Adding message to client: %d, %d\n", ((uint8_t*)data)[0], len);
 	memcpy(&_tcp_data_buffer[_tcp_data_buffer_pos], data, len);
 
 	_tcp_data_buffer_pos += len;
@@ -101,13 +102,18 @@ void Net_client::send_tcp_data() {
 	_tcp_data_buffer_pos = 0;
 }
 
-void Net_client::send_udp_data() {
+void Net_client::send_udp_data(Udp_server* server) {
+	
 	if (_udp_data_buffer_pos == 0) { return; }
 
-	send(info.udp_socket, (const char*)&_tcp_data_buffer[0], _udp_data_buffer_pos, 0);
+	int result = 0;
+
+
+	TRACE("[NET-CLIENT][UDP OUT][%d]\n", _udp_data_buffer_pos);
+
+	server->send_client(this, _udp_data_buffer, _udp_data_buffer_pos);
 	_udp_data_buffer_pos = 0;
 }
-
 
 uint32_t Net_client::get_id() const {
 	return _id;
@@ -160,7 +166,4 @@ SOCKET Net_client::get_tcp_socket() const {
 	return info.tcp_socket;
 }
 
-SOCKET Net_client::get_udp_socket() const {
-	return info.udp_socket;
-}
 

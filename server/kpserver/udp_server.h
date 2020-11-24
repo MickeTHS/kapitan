@@ -56,11 +56,23 @@ struct Udp_server {
     bool init(int port);
     
     int send(const std::vector<Net_client*>& clients, const std::vector<uint8_t>& data, uint32_t len);
+
     int session_send(const std::vector<Net_session_player*>& players, int num_players, const std::vector<uint8_t>& data, uint32_t data_len);
+
+    int send_client(Net_client* client, const std::vector<uint8_t>& data, uint32_t data_len);
+
+    int sendto_addr(const sockaddr* addr, const std::vector<uint8_t>& data, uint32_t data_len);
+
+    int send_data_client(Net_client* client, void* data, uint32_t data_len);
+
     int get_port() const;
+
     void set_on_client_data_callback(std::function<void(Net_client*, const std::vector<uint8_t>&, int32_t)> func);
+
     void set_on_client_connect_callback(std::function<void(Net_client*, const Net_Udp_establish&)> func);
+
     void establish_client_connection(Net_client* client);
+
     void remove_client(Net_client* client);
 
     int read();

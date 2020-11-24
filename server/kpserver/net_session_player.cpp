@@ -22,6 +22,15 @@ Net_session_player::~Net_session_player() {
 
 }
 
+
+void Net_session_player::assign(const Net_session_player& ref) {
+    net_player_short_id = ref.net_player_short_id;
+    net_client_id = ref.net_client_id;
+    client_connection = ref.client_connection;
+
+    is_set = true;
+}
+
 void Net_session_player::assign(uint8_t net_player_short_id_, uint32_t client_id_, Net_client* client) {
     net_player_short_id = net_player_short_id_;
     net_client_id = client_id_;

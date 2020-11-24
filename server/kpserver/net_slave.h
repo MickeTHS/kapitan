@@ -29,7 +29,11 @@ struct Net_slave {
     bool init();
     void update();
     void setup_sessions();
+    void print_sessions() const;
+    void print_sessions_summary() const;
     bool validate_ini();
+
+    void set_session_private(Net_session* session, bool priv);
 private:
     void on_inc_tcp_master_data(const std::vector<uint8_t>& data, int32_t data_len);
     void on_inc_client_udp_data(Net_client* client, const std::vector<uint8_t>& data, int32_t data_len);
@@ -44,6 +48,10 @@ private:
     Net_session* find_empty_session() const;
 
     void sync_session_with_master(Net_session* session);
+
+    void reset_session_lookups(Net_session* session);
+
+    void set_session_lookups(Net_session* session);
     
     Tcp_server                                  _tcp;
     Udp_server                                  _udp;
@@ -60,11 +68,16 @@ private:
 
     std::chrono::time_point<std::chrono::high_resolution_clock> _next_slave_report;
 
+    std::chrono::time_point<std::chrono::high_resolution_clock> _last_tick;
+
     std::unordered_map<uint32_t, Net_session*>  _session_code_lookup; // this is a hash as a key
     std::unordered_map<uint32_t, Net_session*>  _session_id_lookup;
     std::unordered_map<uint32_t, std::shared_ptr<Net_session_player>> _client_id_lookup;
 
     std::vector<std::unique_ptr<Net_session>>   _sessions;
+
+    std::vector<Net_session*>                   _private_sessions;
+    std::vector<Net_session*>                   _public_sessions;
 
     uint32_t                                    _num_players;
 

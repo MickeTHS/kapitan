@@ -81,7 +81,7 @@ bool Udp_server::init(int port) {
 	_addr.sin_addr.s_addr = htonl(INADDR_ANY); // N.B.: differs from sender 
 	_addr.sin_port = htons(_port);
 	
-	int	 nbytes, addrlen;
+	int	 nbytes;
 
 	uint8_t yes = 1;
 
@@ -142,6 +142,14 @@ bool Udp_server::init(int port) {
 		return false;
 	}
 
+	struct timeval tv;
+	tv.tv_sec = 0;
+	tv.tv_usec = 10000;
+
+	if (setsockopt(_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv)) < 0) {
+		TRACE("[UDP-SERVER][Error setting UDP timeout]\n");
+	}
+
 #ifdef WIN32
 	unsigned long mode = 1;
 
@@ -173,6 +181,45 @@ void Udp_server::establish_client_connection(Net_client* client) {
 	client->generate_udp_code();
 
 	_client_id_map[client->info.client_id] = client;
+}
+
+
+int Udp_server::sendto_addr(const sockaddr* addr, const std::vector<uint8_t>& data, uint32_t data_len) {
+
+	int len = 0;
+
+	if ((len = sendto(_socket, (const char*)&data[0], data_len, 0, addr, sizeof(*addr))) <= 0) {
+		print_error();
+	}
+
+	return len;
+}
+
+int Udp_server::send_data_client(Net_client* client, void* data, uint32_t data_len) {
+	if (!client->info.udp_established) {
+		TRACE("[UDP SERVER][Error sending on non established UDP socket]\n");
+		return 0;
+	}
+
+	int len = sendto(_socket, (const char*)&data, data_len, 0, (const sockaddr*)&client->info.udp_addr, client->info.udp_addr_len);
+
+	return len;
+}
+
+int Udp_server::send_client(Net_client* client, const std::vector<uint8_t>& data, uint32_t data_len) {
+	if (!client->info.udp_established) {
+		TRACE("[UDP SERVER][Error sending on non established UDP socket]\n");
+		return 0;
+	}
+
+	if (data_len > data.size()) {
+		TRACE("[UDP SERVER][Error][Attempting to send data outside buffer length: %d]\n", data_len);
+		return 0;
+	}
+
+	int len = sendto(_socket, (const char*)&data[0], data_len, 0, (const sockaddr*)&client->info.udp_addr, client->info.udp_addr_len);
+
+	return len;
 }
 
 void Udp_server::set_on_client_data_callback(std::function<void(Net_client*, const std::vector<uint8_t>&, int32_t)> func) {

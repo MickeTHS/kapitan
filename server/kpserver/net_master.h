@@ -5,6 +5,7 @@
 #include <memory>
 #include <unordered_map>
 #include <chrono>
+#include <string>
 
 #include "tcp_server.h"
 #include "net_packet.h"
@@ -26,12 +27,12 @@ struct Net_session_info {
 
     uint16_t    num_players;
 
-    char        code[16];
+    char        code[8];
     
     mmh::Hash_key session_code_hash;
 
     void set_session_hash() {
-        code[8] = '\0';
+        code[7] = '\0';
 
         session_code_hash = mmh::Hash_key(code);
     }
@@ -56,6 +57,7 @@ struct Net_slave_info {
     uint32_t        session_id_start_range;
 
     char            ip[64];
+    char            hostname[64];
     
     uint16_t        tcp_port;
     uint16_t        udp_port;
@@ -68,7 +70,7 @@ struct Net_slave_info {
 
     //void keepalive();
 
-    void add_session(uint32_t id, const char* code);
+    void add_session_if_not_exists(uint32_t id, const char* code);
     void set_session(uint32_t id, const char* code, uint32_t num_players);
    
     //void clear_old_sessions();

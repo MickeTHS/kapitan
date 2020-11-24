@@ -40,7 +40,7 @@
 #include "process_stats.h"
 #include "trace.h"
 
-
+// -ini C:\projects\kapitan_srv\server\build\kpserver\Debug\slave_eu1.ini
 int main(int argc , char *argv[])
 {
     TRACE("KPSERVER v0.1\n");
@@ -105,6 +105,7 @@ int main(int argc , char *argv[])
         }
 
         slave_node->setup_sessions();
+        slave_node->print_sessions();
 
         // Initiate the slave node
         // This will connect to the master node
