@@ -5,6 +5,10 @@
 World_instance::World_instance() : _time(0) {
     data_transforms.num_items = 0;
     data_transforms.num_players = 0;
+
+    scene.on_item_states_updated = [&](uint16_t id, uint8_t states) {
+        _on_item_states_updated(id, states);
+    };
 }
 
 World_instance::~World_instance() {
@@ -57,20 +61,18 @@ void World_instance::fill_transform() {
 }
 
 bool World_instance::set_item_state(const Net_player_set_item_state_request& request, Net_player_set_item_state_response& resp) {
-     if ((request.flags & 1) == 1) { // locks
-        item_states.set_lock(request.id, request.flags & 2);
-        resp.id = request.id;
-        resp.success = 1;
-     }
-     else { // power
-        item_states.set_power(request.id, request.flags & 2);
-        resp.id = request.id;
-        resp.success = 1;
-     }
-
+    
+    
+    if (!scene.set_item_state(request.id, request.state, request.on)) {
+        return false;
+    }
      return true;
 }
 
 void World_instance::set_item_snapshot_data(uint8_t* data) {
-    item_states.set_data(data);
+    //item_states.set_data(data);
+}
+
+void World_instance::set_on_item_states_updated(std::function<void(uint16_t id, uint8_t state)> func) {
+    _on_item_states_updated = func;
 }

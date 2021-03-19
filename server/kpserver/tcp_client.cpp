@@ -160,7 +160,7 @@ int32_t Tcp_client::read_data(std::vector<uint8_t>& buffer) {
 
     int valread;
 
-    fd_set readfds;
+    /*fd_set readfds;
     FD_ZERO(&readfds);
     FD_SET(_socket, &readfds);
 
@@ -173,7 +173,7 @@ int32_t Tcp_client::read_data(std::vector<uint8_t>& buffer) {
 
     if (!FD_ISSET(_socket, &readfds)) {
         return 0; // no activity so skip this
-    }
+    }*/
 
     if ((valread = recv(_socket, (char*)&buffer[0], 1024, 0)) <= 0)
     {
@@ -242,6 +242,7 @@ int32_t Tcp_client::read_data(std::vector<uint8_t>& buffer) {
 #else
         switch (valread) {
             case -1:
+                return valread;
             case 0:
                 disconnect();
         }

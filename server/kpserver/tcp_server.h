@@ -48,13 +48,14 @@
 
 #include "net_client.h"
 
-/// http://beej.us/guide/bgnet/html/
+
 
 #define CON_SOCKET_DESCR 0
 #define CHAT_SOCKET_DESCR 1
 
 /// <summary>
 /// A Tcp server used by both the slaves and the master
+/// Read more http://beej.us/guide/bgnet/html/
 /// </summary>
 struct Tcp_server {
     Tcp_server();

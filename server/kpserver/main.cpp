@@ -90,8 +90,6 @@ int main(int argc , char *argv[])
         TRACE("[MAIN][MASTER][STARTUP]\n");
 
         master_node = std::make_unique<Net_master>(&ini);
-
-        
     }
     else {
         TRACE("[MAIN][SLAVE][STARTUP]\n");

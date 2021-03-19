@@ -27,6 +27,19 @@ Net_session::Net_session(uint8_t max_players, uint32_t keepalive_seconds, Tcp_se
         _game_starting(false),
         _time_since_snapshot(0) {
 
+    // when an item has had its state updated in the scene
+    // we send out to all players which item and which state
+    // has changed
+    /*
+    Todo: refactor this solution
+    _world->set_on_item_state_updated([&](uint16_t id, uint8_t state) {
+        Net_scene_item_state_updated updated;
+        updated.id = id;
+        updated.state = state;
+        
+        broadcast_tcp(&updated, sizeof(Net_scene_item_state_updated));
+    });*/
+    
     _players.resize(max_players);
     _data_buffer.resize(2000);
     game_config.rules.resize(4 * (int)GameRule::MaxRules);

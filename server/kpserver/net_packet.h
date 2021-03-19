@@ -62,7 +62,8 @@ enum class MsgType {
     NetGameSessionHasStarted,
     NetGameSessionHasEnded,
     NetPlayerSetItemStateRequest,
-    NetPlayerSetItemStateResponse
+    NetPlayerSetItemStateResponse,
+    NetSceneItemStateChanged
 };
 
 enum class NetErrorType {
@@ -275,6 +276,14 @@ struct Net_game_session_has_ended {
 };
 
 
+struct Net_scene_item_state_updated {
+    uint8_t type;
+    uint16_t id;
+    uint8_t state;
+
+    Net_scene_item_state_updated() : type((uint8_t)MsgType::NetSceneItemStateChanged), id(0), state(0) {}
+};
+
 /// <summary>
 /// Gives details of the game state
 /// Mission updates, doors etc
@@ -282,7 +291,7 @@ struct Net_game_session_has_ended {
 struct Net_session_snapshot {
     uint8_t     type;
     uint32_t    session_timestamp;
-    uint8_t     items[32];
+    uint8_t     items[64];
 
     Net_session_snapshot() : type((uint8_t)MsgType::NetSessionSnapshot), session_timestamp(0) {}
 };
@@ -346,8 +355,9 @@ struct Net_player_start_game_session_request {
 
 struct Net_player_set_item_state_request {
     uint8_t type;
-    uint8_t flags; // first bit: type, second bit: on/off
-    uint8_t id;
+    uint16_t id;
+    uint8_t state;
+    uint8_t on;
 
     Net_player_set_item_state_request() : type((uint8_t)MsgType::NetPlayerSetItemStateRequest) {}
 
@@ -805,22 +815,22 @@ struct Net_slave_config {
 /// <summary>
 /// When the player marked as owner
 /// </summary>
-struct Net_player_set_gamerule_int {
+struct Net_player_set_gamerule_int_request {
     uint8_t     type;
     uint16_t    rule_id;
     uint16_t    rule_value;
 
-    Net_player_set_gamerule_int()
+    Net_player_set_gamerule_int_request()
         : type((uint8_t)MsgType::NetPlayerSetGameRuleInt),
           rule_id(0),
           rule_value(0) { }
 
-    Net_player_set_gamerule_int(const std::vector<uint8_t>& data, uint32_t off) {
-        memcpy(this, &data[off], sizeof(Net_player_set_gamerule_int));
+    Net_player_set_gamerule_int_request(const std::vector<uint8_t>& data, uint32_t off) {
+        memcpy(this, &data[off], sizeof(Net_player_set_gamerule_int_request));
     }
 
     void set_buffer(std::vector<uint8_t>& data, uint32_t off) {
-        memcpy(&data[off], &type, sizeof(Net_player_set_gamerule_int));
+        memcpy(&data[off], &type, sizeof(Net_player_set_gamerule_int_request));
     }
 };
 

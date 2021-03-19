@@ -4,6 +4,7 @@
 #include "process_stats.h"
 #include "ini_file.h"
 #include "trace.h"
+#include "world_instance.h"
 
 Net_slave::Net_slave(Ini_file* file, Process_stats* stats) 
     :
@@ -474,9 +475,9 @@ void Net_slave::on_inc_client_tcp_data(Net_client* client, const std::vector<uin
             case MsgType::NetPlayerSetGameRuleInt:
             {
                 // When a gamerule is being set by the owner
-                Net_player_set_gamerule_int gamerule(data, off);
-                off += sizeof(Net_player_set_gamerule_int);
-                len -= sizeof(Net_player_set_gamerule_int);
+                Net_player_set_gamerule_int_request gamerule(data, off);
+                off += sizeof(Net_player_set_gamerule_int_request);
+                len -= sizeof(Net_player_set_gamerule_int_request);
 
                 Net_game_rule_updated rule;
                 rule.rule_id = gamerule.rule_id;
